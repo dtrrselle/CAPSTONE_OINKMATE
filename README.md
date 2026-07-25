@@ -51,8 +51,8 @@ The study covers the following:
 
 ### Decision-Support Features
 
-- Feeding Recommendations
-- Pig Growth Support Guidelines
+- Feeding and Sanitation Recommendations
+- Pig Support Guidelines
 - Estimated Market Value
 - Suggested Selling Period
 
@@ -93,7 +93,19 @@ The system will be evaluated based on:
 
 # Overall Description
 
-> *System Flowchart will be added here.*
+## Data FLow in Farmer Side (App)
+
+<p align="center">
+  <img src="images/flowchart-oinkmate.drawio.png" width="350">
+</p>
+
+---
+
+## Data FLow in Admin Side (Website)
+
+<p align="center">
+  <img src="images/admin-flowchart.drawio.png" width="700">
+</p>
 
 ---
 
