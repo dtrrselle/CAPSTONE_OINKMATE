@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../../../Users/ronia/Desktop/CAPSTONE-OINKMATE"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"python.languageServer": "Pylance"
+	}
+}
