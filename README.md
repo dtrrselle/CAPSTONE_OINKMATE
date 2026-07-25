@@ -93,11 +93,15 @@ The system will be evaluated based on:
 
 # Overall Description
 
+## Data FLow in Farmer Side (App)
+
 <p align="center">
   <img src="images/flowchart-oinkmate.drawio.png" width="350">
 </p>
 
 ---
+
+## Data FLow in Admin Side (Website)
 
 <p align="center">
   <img src="images/admin-flowchart.drawio.png" width="700">
