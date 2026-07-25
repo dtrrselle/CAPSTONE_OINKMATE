@@ -94,13 +94,13 @@ The system will be evaluated based on:
 # Overall Description
 
 <p align="center">
-  <img src="images/flowchart-oinkmate.drawio.png" width="250">
+  <img src="images/flowchart-oinkmate.drawio.png" width="350">
 </p>
 
 ---
 
 <p align="center">
-  <img src="images/admin-flowchart.drawio.png" width="250">
+  <img src="images/admin-flowchart.drawio.png" width="500">
 </p>
 
 ---
