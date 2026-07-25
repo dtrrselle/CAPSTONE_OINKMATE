@@ -51,8 +51,8 @@ The study covers the following:
 
 ### Decision-Support Features
 
-- Feeding Recommendations
-- Pig Growth Support Guidelines
+- Feeding and Sanitation Recommendations
+- Pig Support Guidelines
 - Estimated Market Value
 - Suggested Selling Period
 
