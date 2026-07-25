@@ -1,0 +1,1088 @@
+/* ==========================================================
+   EducationalAdmin.css
+   OinkMate Admin Portal — Educational Content Page
+   Palette: Mist #F4F3F1 | Peony #F2D1D4 | Mauve #D8959B
+            Sage #829672 | Evergreen #344C3D
+   ========================================================== */
+
+.edu-admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 28px 32px 48px;
+  background-color: #F4F3F1;
+  min-height: 100%;
+  font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #344C3D;
+}
+
+/* ---------------- Page Header ---------------- */
+
+.edu-page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+}
+
+.edu-header-text h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: #344C3D;
+  letter-spacing: -0.01em;
+}
+
+.edu-header-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #6b6b66;
+  max-width: 520px;
+}
+
+.edu-header-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  width: 100%;
+}
+
+/* Search bar */
+
+.edu-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e8e4de;
+  border-radius: 12px;
+  padding: 0 14px;
+  flex: 1.6 1 0;
+  min-width: 0;
+  box-shadow: 0 1px 2px rgba(52, 76, 61, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.edu-search-bar:focus-within {
+  border-color: #D8959B;
+  box-shadow: 0 0 0 3px rgba(216, 149, 155, 0.18);
+}
+
+.edu-search-icon {
+  color: #9a958d;
+  flex-shrink: 0;
+  font-size: 15px;
+}
+
+.edu-search-bar input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: #344C3D;
+}
+
+.edu-search-bar input::placeholder {
+  color: #aba79f;
+}
+
+/* Filter select */
+
+.edu-filter-select,
+.edu-form-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.edu-filter-select select,
+.edu-form-select select {
+  appearance: none;
+  background: #ffffff;
+  border: 1px solid #e8e4de;
+  border-radius: 12px;
+  padding: 0 36px 0 14px;
+  font-size: 14px;
+  color: #344C3D;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 1px 2px rgba(52, 76, 61, 0.04);
+  transition: border-color 0.2s ease;
+}
+
+.edu-filter-select select:focus,
+.edu-form-select select:focus {
+  outline: none;
+  border-color: #D8959B;
+  box-shadow: 0 0 0 3px rgba(216, 149, 155, 0.18);
+}
+
+.edu-select-chevron {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: #9a958d;
+  font-size: 14px;
+}
+
+/* Buttons */
+
+.edu-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #344C3D;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(52, 76, 61, 0.18);
+  transition: background 0.2s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.edu-btn-primary:hover {
+  background: #2a3e31;
+  transform: translateY(-1px);
+}
+
+.edu-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #344C3D;
+  border: 1px solid #e8e4de;
+  border-radius: 12px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.edu-btn-secondary:hover {
+  background: #f4f3f1;
+}
+
+/* Header control row: balance button widths against search/filters */
+
+.edu-header-actions .edu-btn-secondary,
+.edu-header-actions .edu-btn-primary {
+  flex: 1.1 1 0;
+  justify-content: center;
+  min-width: 0;
+}
+
+.edu-btn-delete {
+  background: #c0454f;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.edu-btn-delete:hover {
+  background: #a8373f;
+}
+
+/* ---------------- Stats Grid ---------------- */
+
+.edu-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.edu-stat-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(52, 76, 61, 0.06);
+  border: 1px solid #e8e4de;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.edu-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(52, 76, 61, 0.1);
+}
+
+.edu-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.edu-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: #F2D1D4;
+  color: #344C3D;
+}
+
+.icon-total,
+.icon-advisory,
+.icon-published,
+.icon-draft {
+  background: #F2D1D4;
+  color: #344C3D;
+}
+
+.edu-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.edu-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #344C3D;
+  line-height: 1.1;
+}
+
+.edu-stat-label {
+  font-size: 12.5px;
+  color: #80807a;
+  font-weight: 500;
+}
+
+/* ---------------- Table ---------------- */
+
+.edu-table-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8e4de;
+  box-shadow: 0 2px 8px rgba(52, 76, 61, 0.05);
+  overflow: hidden;
+}
+
+.edu-table-wrapper {
+  overflow-x: auto;
+}
+
+.edu-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.edu-table thead th {
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #80807a;
+  background: #FAF9F7;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e8e4de;
+}
+
+.edu-table tbody td {
+  padding: 14px 18px;
+  font-size: 14px;
+  color: #344C3D;
+  border-bottom: 1px solid #f3f1ee;
+  vertical-align: middle;
+}
+
+.edu-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.edu-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.edu-table tbody tr:hover {
+  background: #FAF9F7;
+}
+
+.edu-title-cell {
+  font-weight: 600;
+  max-width: 280px;
+}
+
+.edu-actions-col {
+  text-align: right;
+}
+
+.edu-row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.edu-no-results {
+  text-align: center;
+  padding: 36px 18px !important;
+  color: #9a958d;
+  font-size: 14px;
+}
+
+/* Icon buttons */
+
+.edu-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid #e8e4de;
+  background: #ffffff;
+  color: #344C3D;
+  cursor: pointer;
+  font-size: 14.5px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.edu-icon-btn:hover {
+  background: #f4f3f1;
+  color: #344C3D;
+  border-color: #d8d4cc;
+}
+
+.edu-icon-btn-danger:hover {
+  background: #f4f3f1;
+  border-color: #d8d4cc;
+  color: #a8373f;
+}
+
+/* ---------------- Badges ---------------- */
+
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 100px;
+  background: #ffffff;
+  border: 1px solid #e8e4de;
+  color: #344C3D;
+  white-space: nowrap;
+}
+
+.category-feeding-guide,
+.category-sanitation-guide,
+.category-pig-health,
+.category-disease-prevention,
+.category-farm-management,
+.category-advisory {
+  background: #ffffff;
+  border: 1px solid #e8e4de;
+  color: #344C3D;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 100px;
+  background: #ffffff;
+  border: 1px solid #e8e4de;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-published {
+  color: #829672;
+}
+
+.status-published .status-dot {
+  background: #829672;
+}
+
+.status-draft {
+  color: #80807a;
+}
+
+.status-draft .status-dot {
+  background: #9a958d;
+}
+
+/* ---------------- Section title ---------------- */
+
+.edu-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #344C3D;
+  margin: 0;
+}
+
+/* ---------------- Content Cards Grid ---------------- */
+
+.edu-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.edu-content-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8e4de;
+  box-shadow: 0 2px 8px rgba(52, 76, 61, 0.05);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.edu-content-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(52, 76, 61, 0.12);
+}
+
+.edu-card-thumb {
+  height: 140px;
+  background: #F2D1D4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: #344C3D;
+  border-bottom: 1px solid #e8e4de;
+}
+
+.edu-card-body {
+  padding: 16px 18px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.edu-card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.edu-card-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #344C3D;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.edu-card-desc {
+  font-size: 13px;
+  color: #80807a;
+  margin: 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.edu-card-date {
+  font-size: 12px;
+  color: #aba79f;
+  font-weight: 500;
+}
+
+.edu-card-actions {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid #f3f1ee;
+  margin-top: 10px;
+}
+
+.edu-no-results-cards {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: #9a958d;
+  font-size: 14px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8e4de;
+}
+
+/* ---------------- Modals ---------------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(52, 76, 61, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: edu-fade-in 0.15s ease;
+}
+
+@keyframes edu-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(52, 76, 61, 0.25);
+  animation: edu-pop-in 0.18s ease;
+}
+
+.modal-card-large {
+  max-width: 620px;
+}
+
+.modal-card-library {
+  max-width: 920px;
+}
+
+.edu-library-empty {
+  text-align: center;
+  color: #9a958d;
+  font-size: 14px;
+  padding: 40px 0;
+}
+
+@keyframes edu-pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0ede9;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #344C3D;
+}
+
+.modal-close-btn {
+  background: #f4f3f1;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b6b66;
+  transition: background 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  background: #e9e6e1;
+}
+
+.modal-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 24px;
+  border-top: 1px solid #f0ede9;
+}
+
+/* ---------------- Form (Add / Edit) ---------------- */
+
+.edu-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.edu-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.edu-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edu-form-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #344C3D;
+}
+
+.edu-form-row input,
+.edu-form-row textarea {
+  border: 1px solid #e8e4de;
+  border-radius: 11px;
+  padding: 10px 13px;
+  font-size: 14px;
+  color: #344C3D;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.edu-form-row input:focus,
+.edu-form-row textarea:focus {
+  outline: none;
+  border-color: #D8959B;
+  box-shadow: 0 0 0 3px rgba(216, 149, 155, 0.18);
+}
+
+.edu-form-select select {
+  width: 100%;
+}
+
+.edu-upload-placeholder {
+  border: 1.5px dashed #d8d4cc;
+  border-radius: 12px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #9a958d;
+  font-size: 13px;
+  cursor: pointer;
+  background: #FAF9F7;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.edu-upload-placeholder:hover {
+  border-color: #D8959B;
+  background: #fdf6f7;
+}
+
+.edu-upload-placeholder svg {
+  font-size: 22px;
+  color: #c0bab0;
+}
+
+/* ---------------- View Modal ---------------- */
+
+.edu-view-thumb {
+  height: 160px;
+  border-radius: 14px;
+  background: #F2D1D4;
+  border: 1px solid #e8e4de;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #344C3D;
+  margin-bottom: 16px;
+}
+
+.edu-view-meta-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.edu-view-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #344C3D;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.edu-view-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #9a958d;
+  margin-bottom: 14px;
+}
+
+.edu-view-dot {
+  color: #d8d4cc;
+}
+
+.edu-view-description {
+  font-size: 14.5px;
+  color: #5e5e58;
+  line-height: 1.6;
+  font-style: italic;
+  margin: 0 0 16px 0;
+}
+
+.edu-view-divider {
+  height: 1px;
+  background: #f0ede9;
+  margin-bottom: 16px;
+}
+
+.edu-view-body {
+  font-size: 14.5px;
+  color: #344C3D;
+  line-height: 1.75;
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* ---------------- Delete Modal ---------------- */
+
+.edu-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+
+.edu-delete-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(192, 69, 79, 0.12);
+  color: #c0454f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.edu-delete-confirm p {
+  margin: 0;
+  font-size: 14.5px;
+  color: #344C3D;
+  max-width: 320px;
+}
+
+.edu-delete-item-title {
+  font-size: 13px;
+  color: #9a958d;
+  font-weight: 600;
+}
+
+/* ---------------- Empty State ---------------- */
+
+.edu-empty-state {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e8e4de;
+  padding: 64px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.edu-empty-illustration {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #F2D1D4;
+  color: #344C3D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  margin-bottom: 12px;
+}
+
+.edu-empty-state h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #344C3D;
+  margin: 0;
+}
+
+.edu-empty-state p {
+  font-size: 13.5px;
+  color: #9a958d;
+  margin: 0 0 14px 0;
+  max-width: 320px;
+}
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 1100px) {
+  .edu-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .edu-header-actions {
+    flex-wrap: wrap;
+  }
+
+  .edu-search-bar {
+    flex: 1 1 100%;
+  }
+
+  .edu-filter-select {
+    flex: 1 1 calc(50% - 7px);
+  }
+
+  .edu-header-actions .edu-btn-secondary,
+  .edu-header-actions .edu-btn-primary {
+    flex: 1 1 calc(50% - 7px);
+  }
+
+  .edu-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .edu-admin-page {
+    padding: 20px 16px 36px;
+  }
+
+  .edu-header-actions {
+    flex-direction: column;
+  }
+
+  .edu-search-bar,
+  .edu-filter-select,
+  .edu-header-actions .edu-btn-secondary,
+  .edu-header-actions .edu-btn-primary {
+    flex: 1 1 100%;
+  }
+
+  .edu-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .edu-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .edu-table {
+    min-width: 640px;
+  }
+}
+
+/* ============================================================
+   PASTE MO ITO SA DULO NG IYONG EducationalAdmin.css
+   ============================================================ */
+
+/* ── Action button colors ────────────────────────────────────
+   View  = blue
+   Edit  = amber / yellow
+   Delete = red
+   ---------------------------------------------------------- */
+
+.edu-icon-btn--view {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.edu-icon-btn--view:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.edu-icon-btn--edit {
+  color: #d97706;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+.edu-icon-btn--edit:hover {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #b45309;
+}
+
+.edu-icon-btn--delete {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.edu-icon-btn--delete:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+/* ── Status badge colors ─────────────────────────────────────
+   Published = green
+   Draft     = gray
+   ---------------------------------------------------------- */
+
+.status-published {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+.status-published .status-dot {
+  background: #16a34a;
+}
+
+.status-draft {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  color: #6b7280;
+}
+.status-draft .status-dot {
+  background: #9ca3af;
+}
+
+/* ── Delete modal header variant ─────────────────────────────*/
+
+.modal-header--danger {
+  background: #fef2f2;
+  border-bottom-color: #fecaca;
+}
+.modal-header--danger h3 {
+  color: #dc2626;
+}
+
+/* ── Delete note text ────────────────────────────────────────*/
+
+.edu-delete-note {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 8px 0 0;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* ── Pulse icon for final confirm ────────────────────────────*/
+
+.edu-delete-icon--pulse {
+  background: #fef2f2;
+  color: #dc2626;
+  animation: edu-pulse 1.4s ease infinite;
+}
+
+@keyframes edu-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.3); }
+  50%       { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);  }
+}
+
+/* ── Amber edit button (in view modal footer) ────────────────*/
+
+.edu-btn--amber {
+  color: #d97706 !important;
+  border-color: #fde68a !important;
+  background: #fffbeb !important;
+}
+.edu-btn--amber:hover {
+  background: #fef3c7 !important;
+}
+
+/* ── Toast notifications ─────────────────────────────────────*/
+
+.edu-toast-container {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 2000;
+}
+
+.edu-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  min-width: 260px;
+  max-width: 380px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  animation: edu-toast-in 0.22s ease;
+}
+
+@keyframes edu-toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.edu-toast--success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.edu-toast--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.edu-toast span {
+  flex: 1;
+}
+
+.edu-toast-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.15s;
+}
+.edu-toast-close:hover { opacity: 1; }
