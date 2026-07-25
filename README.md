@@ -100,7 +100,7 @@ The system will be evaluated based on:
 ---
 
 <p align="center">
-  <img src="images/admin-flowchart.drawio.png" width="500">
+  <img src="images/admin-flowchart.drawio.png" width="700">
 </p>
 
 ---
