@@ -40,7 +40,7 @@ The study covers the following:
 - Automated feeding based on scheduled feed dispensing.
 - Farmer input of pig population, age in days, and estimated weight.
 - Feeding recommendations based on predefined feeding references.
-- Centralized tracking of farmer activity, feedback, and educational content through the admin system.
+- Centralized tracking of farmer records, feedback, and educational content through the admin system.
 
 ### Mobile Application Features
 
