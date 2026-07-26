@@ -258,12 +258,14 @@ The system will be evaluated based on:
 ### Software
 
 - React Native (Expo)
-- React (Admin Website)
+- React Vite(Admin Website)
 - TypeScript
 - PHP
 - MySQL
 - XAMPP
 - Git & GitHub
+- Vscode
+- Bruno and Postman
 
 ---
 
