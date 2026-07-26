@@ -49,7 +49,7 @@ The study covers the following:
 - Manual Override Controls
 - Multi-Pen Management
 
-### Decision-Support Features
+### PAPALITAN PA
 
 - Feeding and Sanitation Recommendations
 - Pig Support Guidelines
