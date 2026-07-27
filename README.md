@@ -113,7 +113,7 @@ The system will be evaluated based on:
 <p align="center">
   <img src="images/system_archiss.png" width="700">
 </ps
----
+
 
 # System Requirements
 
