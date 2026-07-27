@@ -108,6 +108,11 @@ The system will be evaluated based on:
   <img src="images/admin-flowchart.drawio.png" width="700">
 </p>
 
+## System Architecture
+
+<p align="center">
+  <img src="images/system_archi.png" width="700">
+</p>
 ---
 
 # System Requirements
