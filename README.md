@@ -114,6 +114,7 @@ The system will be evaluated based on:
   <img src="images/system_archiss.png" width="700">
 </ps
 
+---
 
 # System Requirements
 
