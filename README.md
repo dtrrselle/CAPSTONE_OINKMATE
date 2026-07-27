@@ -111,7 +111,7 @@ The system will be evaluated based on:
 ## System Architecture
 
 <p align="center">
-  <img src="images/system_archi.png" width="700">
+  <img src="images/system_archis.png" width="700">
 </p>
 ---
 
