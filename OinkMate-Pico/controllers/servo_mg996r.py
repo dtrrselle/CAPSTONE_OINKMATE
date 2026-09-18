@@ -1,160 +1,278 @@
 """
-MG996R servo motor controller (feeding gate / stopper).
+MG996R DUAL SERVO CONTROLLER - OinkMate
+
+Purpose:
+    Controls the two MG996R feeding servos as ONE synchronized pair.
 
 Hardware:
-    Signal -> GP10 (PWM)
-    VCC    -> VBUS (5V)
-    GND    -> GND
+    MG996R #1 Signal -> GP10
+    MG996R #2 Signal -> GP11
+    VCC -> 5V
+    GND -> GND
 
-Standard hobby servo control: 50 Hz PWM, pulse width ~0.5 ms (0 deg) to
-~2.5 ms (180 deg). Angles are converted to a duty_u16 value for
-machine.PWM using a linear mapping between the min/max pulse widths.
+Both MG996R servos always perform the SAME movement at the SAME time.
 
-Unlike the MG90S sweep controller, this servo does not continuously
-sweep. It performs a single feeding cycle: rotate smoothly from CLOSED
-(0 degrees) to OPEN (90 degrees), hold briefly, then rotate smoothly
-back to CLOSED.
+Normal feeding cycle:
+    CLOSED (45 degrees)
+        ->
+    OPEN (0 degrees)
+        ->
+    HOLD
+        ->
+    CLOSED (45 degrees)
 
-This module is a standalone hardware controller only. It does not
-connect to WiFi, call the API, or implement any scheduling/automation
-logic.
+MANUAL OVERRIDE:
+    Manual feeding starts the same normal feeding cycle.
+
+    IMPORTANT:
+    The feeding cycle CANNOT be force-stopped while it is running.
+    This keeps the servo movement smooth and uninterrupted.
+
+This module does not connect to WiFi directly.
 """
 
 import machine
 import utime
 
-# --------------------------------------------------------------------------
-# Configuration constants
-# --------------------------------------------------------------------------
-_SERVO_PIN = 10
-_PWM_FREQ = 50  # Standard servo PWM frequency (Hz)
 
-# Pulse width range for the MG996R, in milliseconds.
-# These are typical values and may be fine-tuned per servo unit.
-_MIN_PULSE_MS = 0.5   # corresponds to 0 degrees
-_MAX_PULSE_MS = 2.5   # corresponds to 180 degrees
+# --------------------------------------------------------------------------
+# CONFIGURATION
+# --------------------------------------------------------------------------
 
-# Servo angle range
+_SERVO_1_PIN = 10
+_SERVO_2_PIN = 11
+
+_PWM_FREQ = 50
+
+_MIN_PULSE_MS = 0.5
+_MAX_PULSE_MS = 2.5
+
 _MIN_ANGLE = 0
 _MAX_ANGLE = 180
 
-# Gate positions
-_CLOSED_ANGLE = 0    # gate closed (starting position)
-_OPEN_ANGLE = 90     # gate open
+_CLOSED_ANGLE = 45
+_OPEN_ANGLE = 0
 
-# Smooth-motion tuning
-_STEP_DEGREES = 2       # angle increment per movement step (smoothness)
-_STEP_DELAY_MS = 20     # delay between steps (ms)
+_STEP_DEGREES = 2
+_STEP_DELAY_MS = 20
 
-_PERIOD_MS = 1000 / _PWM_FREQ  # PWM period in ms (20 ms at 50 Hz)
+_PERIOD_MS = 1000 / _PWM_FREQ
 
-_pwm = machine.PWM(machine.Pin(_SERVO_PIN))
-_pwm.freq(_PWM_FREQ)
 
-# Tracks the servo's last known angle so movements start from the
-# current position instead of jumping.
+# --------------------------------------------------------------------------
+# PWM INITIALIZATION
+# --------------------------------------------------------------------------
+
+_pwm_1 = machine.PWM(
+    machine.Pin(_SERVO_1_PIN)
+)
+
+_pwm_2 = machine.PWM(
+    machine.Pin(_SERVO_2_PIN)
+)
+
+_pwm_1.freq(_PWM_FREQ)
+_pwm_2.freq(_PWM_FREQ)
+
+
+# Both servos start logically at the same position.
 _current_angle = _CLOSED_ANGLE
 
 
-def set_angle(angle):
-    """
-    Move the servo directly to the given angle (no smoothing) by
-    converting it to a PWM duty cycle. Updates the tracked current
-    angle.
+# --------------------------------------------------------------------------
+# ANGLE -> PWM
+# --------------------------------------------------------------------------
 
-    Args:
-        angle (int or float): Target angle, clamped to [0, 180].
+def _angle_to_duty_u16(angle):
     """
-    global _current_angle
+    Convert an angle to a 16-bit PWM duty value.
 
-    # Clamp angle to the valid servo range.
+    The SAME PWM value is used for both MG996R servos.
+    """
+
     if angle < _MIN_ANGLE:
         angle = _MIN_ANGLE
+
     elif angle > _MAX_ANGLE:
         angle = _MAX_ANGLE
 
-    # Linear interpolation from angle -> pulse width (ms).
     pulse_ms = _MIN_PULSE_MS + (
-        (angle - _MIN_ANGLE) / (_MAX_ANGLE - _MIN_ANGLE)
-    ) * (_MAX_PULSE_MS - _MIN_PULSE_MS)
+        (angle - _MIN_ANGLE)
+        / (_MAX_ANGLE - _MIN_ANGLE)
+    ) * (
+        _MAX_PULSE_MS - _MIN_PULSE_MS
+    )
 
-    # Convert pulse width -> duty cycle fraction of the PWM period.
     duty_fraction = pulse_ms / _PERIOD_MS
 
-    # Convert duty fraction -> 16-bit duty value.
-    duty_u16 = int(duty_fraction * 65535)
+    duty_u16 = int(
+        duty_fraction * 65535
+    )
 
-    _pwm.duty_u16(duty_u16)
+    return duty_u16
+
+
+# --------------------------------------------------------------------------
+# SYNCHRONIZED SERVO MOVEMENT
+# --------------------------------------------------------------------------
+
+def set_angle(angle):
+    """
+    Move BOTH MG996R servos to the same angle.
+
+    GP10 -> MG996R #1
+    GP11 -> MG996R #2
+    """
+
+    global _current_angle
+
+    duty_u16 = _angle_to_duty_u16(
+        angle
+    )
+
+    _pwm_1.duty_u16(
+        duty_u16
+    )
+
+    _pwm_2.duty_u16(
+        duty_u16
+    )
+
     _current_angle = angle
 
 
-def _move_smooth(target_angle, step_degrees=_STEP_DEGREES,
-                  step_delay_ms=_STEP_DELAY_MS):
+def _move_smooth(
+    target_angle,
+    step_degrees=_STEP_DEGREES,
+    step_delay_ms=_STEP_DELAY_MS
+):
     """
-    Gradually move the servo from its current angle to the target angle,
-    in small increments, to avoid sudden/jerky motion.
+    Smoothly move BOTH MG996R servos together.
 
-    Args:
-        target_angle (int or float): Angle to move to (0-180 degrees).
-        step_degrees (int): Angle increment per step.
-        step_delay_ms (int): Delay between steps, in milliseconds.
+    No network calls or manual-override checks are performed
+    during movement.
+
+    This keeps the physical servo movement smooth and uninterrupted.
     """
+
     global _current_angle
 
     if target_angle > _current_angle:
         step = step_degrees
+
     else:
         step = -step_degrees
 
     angle = _current_angle
-    # Move in increments until within one step of the target.
+
     while abs(target_angle - angle) > abs(step):
+
         angle += step
+
+        # BOTH servos receive the same command.
         set_angle(angle)
-        utime.sleep_ms(step_delay_ms)
 
-    # Final precise move to the exact target angle.
-    set_angle(target_angle)
+        utime.sleep_ms(
+            step_delay_ms
+        )
 
+    # Final exact position.
+    set_angle(
+        target_angle
+    )
+
+
+# --------------------------------------------------------------------------
+# FEEDING MOVEMENTS
+# --------------------------------------------------------------------------
 
 def open_gate():
-    """Rotate smoothly from CLOSED to OPEN (90 degrees)."""
-    _move_smooth(_OPEN_ANGLE)
+    """
+    Open BOTH feeding gates smoothly.
+    """
+
+    _move_smooth(
+        _OPEN_ANGLE
+    )
 
 
 def close_gate():
-    """Rotate smoothly back from OPEN to CLOSED (0 degrees)."""
-    _move_smooth(_CLOSED_ANGLE)
-
-
-def feed_cycle(open_time=5):
     """
-    Execute one complete feeding cycle:
-
-        Close position -> Open gate (90 deg) -> Hold open for
-        `open_time` seconds -> Close gate -> Stop.
-
-    This runs only once per call; it does not loop or sweep
-    continuously.
-
-    Args:
-        open_time (int or float): How long to hold the gate open, in
-            seconds. Defaults to 5 seconds.
+    Close BOTH feeding gates smoothly.
     """
-    # Ensure the gate starts from the closed position.
+
+    _move_smooth(
+        _CLOSED_ANGLE
+    )
+
+
+# --------------------------------------------------------------------------
+# FEEDING CYCLE
+# --------------------------------------------------------------------------
+
+def feed_cycle(
+    open_time=5
+):
+    """
+    Execute one complete synchronized feeding cycle.
+
+    Behavior:
+
+        1. Close both gates.
+        2. Smoothly open both gates.
+        3. Hold open for open_time seconds.
+        4. Smoothly close both gates.
+
+    IMPORTANT:
+        Once the cycle starts, it is allowed to finish normally.
+        There is NO force-stop or network checking during movement.
+    """
+
+    # --------------------------------------------------------------
+    # 1. Ensure BOTH gates start closed.
+    # --------------------------------------------------------------
+
     close_gate()
 
-    # Open the gate to release feed.
+
+    # --------------------------------------------------------------
+    # 2. Open BOTH gates smoothly.
+    # --------------------------------------------------------------
+
     open_gate()
 
-    # Hold open for the specified duration.
-    utime.sleep(open_time)
 
-    # Close the gate to stop feeding.
+    # --------------------------------------------------------------
+    # 3. HOLD OPEN
+    # --------------------------------------------------------------
+
+    utime.sleep(
+        open_time
+    )
+
+
+    # --------------------------------------------------------------
+    # 4. Close BOTH gates smoothly.
+    # --------------------------------------------------------------
+
     close_gate()
 
 
+    return False
+
+
+# --------------------------------------------------------------------------
+# STANDALONE TEST
+# --------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    print("Starting MG996R Feeding Test...")
+
+    print(
+        "Starting MG996R Dual Servo Feeding Test..."
+    )
+
     feed_cycle()
-    print("Feeding Cycle Complete.")
+
+    print(
+        "MG996R Dual Servo Feeding Test Complete."
+    )

@@ -11,8 +11,8 @@
 # ---------------------------------------------------------------------------
 # WiFi Settings
 # ---------------------------------------------------------------------------
-WIFI_SSID = "HEART"
-WIFI_PASSWORD = "Twobrothers1999"
+WIFI_SSID = "Capstone"
+WIFI_PASSWORD = "Piggery123"
 
 # Max seconds to wait for a WiFi connection attempt before giving up
 WIFI_CONNECT_TIMEOUT = 15
@@ -21,11 +21,12 @@ WIFI_CONNECT_TIMEOUT = 15
 # Backend API Settings
 # ---------------------------------------------------------------------------
 # Base URL of the PHP backend (no trailing slash)
-API_BASE_URL = "https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api"
+API_BASE_URL = "https://oinkmate.online/oinkmate-api/api"
 
 # Specific endpoint paths (appended to API_BASE_URL)
 ENVIRONMENT_UPLOAD_ENDPOINT = "/iot/environment/upload_environment.php"
 FEED_LEVELS_UPLOAD_ENDPOINT = "/iot/feeding/upload_feed_levels.php"
+WATER_USAGE_UPLOAD_ENDPOINT = "/expenses/record_water_usage.php"
 
 # How long (seconds) to wait for a response from the server
 HTTP_TIMEOUT = 10
@@ -41,3 +42,4 @@ DEVICE_CODE = "OINKMATE-001"
 # ---------------------------------------------------------------------------
 # How often (seconds) the main loop should perform an upload cycle
 UPLOAD_INTERVAL = 60
+

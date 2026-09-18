@@ -72,22 +72,42 @@ def upload_environment(temperature, humidity, ammonia):
     return _post_json(config.ENVIRONMENT_UPLOAD_ENDPOINT, payload)
 
 
-def upload_feed_levels(container_1, container_2, container_3):
+def upload_feed_levels(device_code, container_1, container_2):
     """
     Send feed level readings to the backend.
 
     Args:
+        device_code (str): unique code identifying this device
         container_1 (float/int): level of container 1
         container_2 (float/int): level of container 2
-        container_3 (float/int): level of container 3
+
+    Returns:
+        dict or None: parsed server response, or None on failure.
+    """
+    payload = {
+        "device_code": device_code,
+        "container_1": container_1,
+        "container_2": container_2
+    }
+    return _post_json(config.FEED_LEVELS_UPLOAD_ENDPOINT, payload)
+
+
+def upload_water_usage(water_liters):
+    """
+    Send a water usage reading (from the YF-S201 flow sensor) to the backend.
+
+    Args:
+        water_liters (float): incremental liters consumed since the
+            previous water-flow reading/upload (i.e. since the last
+            read_incremental_liters() call) - NOT a running/daily total.
+            The backend accumulates these incremental readings into
+            today's total.
 
     Returns:
         dict or None: parsed server response, or None on failure.
     """
     payload = {
         "device_code": config.DEVICE_CODE,
-        "container_1": container_1,
-        "container_2": container_2,
-        "container_3": container_3
+        "water_liters": water_liters
     }
-    return _post_json(config.FEED_LEVELS_UPLOAD_ENDPOINT, payload)
+    return _post_json(config.WATER_USAGE_UPLOAD_ENDPOINT, payload)

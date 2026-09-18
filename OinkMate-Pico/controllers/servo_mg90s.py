@@ -1,170 +1,384 @@
 """
-MG90S servo motor controller (sanitation hose nozzle).
+MG90S DUAL SERVO CONTROLLER - OinkMate
+
+Purpose:
+    Controls the two MG90S sanitation servos as ONE synchronized pair.
 
 Hardware:
-    Signal -> GP13 (PWM)
-    VCC    -> VBUS (5V)
-    GND    -> GND
+    MG90S #1 Signal -> GP13
+    MG90S #2 Signal -> GP14
+    VCC -> 5V
+    GND -> GND
 
-Standard hobby servo control: 50 Hz PWM, pulse width ~0.5 ms (0 deg) to
-~2.5 ms (180 deg). Angles are converted to a duty_u16 value for
-machine.PWM using a linear mapping between the min/max pulse widths.
+Both MG90S servos always perform the SAME movement at the SAME time.
 
-This module is a standalone hardware controller only. It does not connect
-to WiFi, call the API, or implement any scheduling/automation logic.
+Normal sweep:
+    LEFT
+        ->
+    RIGHT
+        ->
+    LEFT
+        ->
+    ...
+        ->
+    CENTER
+
+Default sweep duration:
+    5 seconds
+
+ADDED MANUAL-OVERRIDE FEATURE:
+    sweep() may optionally receive a stop_check callback.
+
+    If stop_check is NOT supplied:
+        The original sweep behavior is unchanged.
+
+    If stop_check IS supplied:
+        The sweep periodically checks whether the user has
+        turned manual sanitation OFF.
+
+        If STOP is detected:
+            Both servos safely return to CENTER,
+            then the cycle ends.
+
+This module does not connect to WiFi directly.
 """
 
 import machine
 import utime
 
-# --------------------------------------------------------------------------
-# Configuration constants
-# --------------------------------------------------------------------------
-_SERVO_PIN = 13
-_PWM_FREQ = 50  # Standard servo PWM frequency (Hz)
 
-# Pulse width range for the MG90S, in milliseconds.
-# These are typical values and may be fine-tuned per servo unit.
-_MIN_PULSE_MS = 0.5   # corresponds to 0 degrees
-_MAX_PULSE_MS = 2.5   # corresponds to 180 degrees
+# --------------------------------------------------------------------------
+# CONFIGURATION
+# --------------------------------------------------------------------------
 
-# Servo angle range
+_SERVO_1_PIN = 13
+_SERVO_2_PIN = 14
+
+_PWM_FREQ = 50
+
+_MIN_PULSE_MS = 0.5
+_MAX_PULSE_MS = 2.5
+
 _MIN_ANGLE = 0
 _MAX_ANGLE = 180
+
 _CENTER_ANGLE = 90
 
-# Sweep motion tuning
-_SWEEP_STEP_DEGREES = 2      # angle increment per movement step (smoothness)
-_SWEEP_STEP_DELAY_MS = 50    # delay between steps (ms)
+_SWEEP_STEP_DEGREES = 2
+_SWEEP_STEP_DELAY_MS = 50
 
-_PERIOD_MS = 1000 / _PWM_FREQ  # PWM period in ms (20 ms at 50 Hz)
+_PERIOD_MS = 1000 / _PWM_FREQ
 
-_pwm = machine.PWM(machine.Pin(_SERVO_PIN))
-_pwm.freq(_PWM_FREQ)
 
-# Tracks the servo's last known angle so movements (e.g. sweep) can move
-# gradually from the current position instead of jumping.
+# --------------------------------------------------------------------------
+# PWM INITIALIZATION
+# --------------------------------------------------------------------------
+
+_pwm_1 = machine.PWM(
+    machine.Pin(_SERVO_1_PIN)
+)
+
+_pwm_2 = machine.PWM(
+    machine.Pin(_SERVO_2_PIN)
+)
+
+_pwm_1.freq(_PWM_FREQ)
+_pwm_2.freq(_PWM_FREQ)
+
+
+# Both servos start logically at center.
 _current_angle = _CENTER_ANGLE
 
 
+# --------------------------------------------------------------------------
+# ANGLE -> PWM
+# --------------------------------------------------------------------------
+
 def _angle_to_duty_u16(angle):
     """
-    Convert a servo angle (0-180 degrees) to a 16-bit PWM duty value.
+    Convert an angle to a 16-bit PWM duty value.
 
-    Args:
-        angle (int or float): Target angle, clamped to [0, 180].
-
-    Returns:
-        int: duty_u16 value (0-65535) for machine.PWM.
+    The SAME PWM value is used for both MG90S servos.
     """
-    # Clamp angle to the valid servo range.
+
     if angle < _MIN_ANGLE:
         angle = _MIN_ANGLE
+
     elif angle > _MAX_ANGLE:
         angle = _MAX_ANGLE
 
-    # Linear interpolation from angle -> pulse width (ms).
     pulse_ms = _MIN_PULSE_MS + (
-        (angle - _MIN_ANGLE) / (_MAX_ANGLE - _MIN_ANGLE)
-    ) * (_MAX_PULSE_MS - _MIN_PULSE_MS)
+        (angle - _MIN_ANGLE)
+        / (_MAX_ANGLE - _MIN_ANGLE)
+    ) * (
+        _MAX_PULSE_MS - _MIN_PULSE_MS
+    )
 
-    # Convert pulse width -> duty cycle fraction of the PWM period.
-    duty_fraction = pulse_ms / _PERIOD_MS
+    duty_fraction = (
+        pulse_ms / _PERIOD_MS
+    )
 
-    # Convert duty fraction -> 16-bit duty value.
-    duty_u16 = int(duty_fraction * 65535)
+    duty_u16 = int(
+        duty_fraction * 65535
+    )
 
     return duty_u16
 
 
+# --------------------------------------------------------------------------
+# SYNCHRONIZED SERVO MOVEMENT
+# --------------------------------------------------------------------------
+
 def _set_angle(angle):
     """
-    Move the servo directly to the given angle (no smoothing) and update
-    the tracked current angle.
+    Move BOTH MG90S servos to the same angle.
 
-    Args:
-        angle (int or float): Target angle (0-180 degrees).
+    GP13 -> MG90S #1
+    GP14 -> MG90S #2
     """
+
     global _current_angle
 
-    duty_u16 = _angle_to_duty_u16(angle)
-    _pwm.duty_u16(duty_u16)
+    duty_u16 = _angle_to_duty_u16(
+        angle
+    )
+
+    _pwm_1.duty_u16(
+        duty_u16
+    )
+
+    _pwm_2.duty_u16(
+        duty_u16
+    )
+
     _current_angle = angle
 
 
-def _move_smooth(target_angle, step_degrees=_SWEEP_STEP_DEGREES,
-                  step_delay_ms=_SWEEP_STEP_DELAY_MS):
+def _move_smooth(
+    target_angle,
+    step_degrees=_SWEEP_STEP_DEGREES,
+    step_delay_ms=_SWEEP_STEP_DELAY_MS,
+    stop_check=None
+):
     """
-    Gradually move the servo from its current angle to the target angle,
-    in small increments, to avoid sudden/jerky motion.
+    Smoothly move BOTH MG90S servos together.
 
-    Args:
-        target_angle (int or float): Angle to move to (0-180 degrees).
-        step_degrees (int): Angle increment per step.
-        step_delay_ms (int): Delay between steps, in milliseconds.
+    Existing behavior is preserved when stop_check is None.
+
+    If stop_check is supplied, it is checked between movement steps.
+
+    Returns:
+        True  -> movement was stopped by manual override.
+        False -> target was reached normally.
     """
+
     global _current_angle
 
     if target_angle > _current_angle:
         step = step_degrees
+
     else:
         step = -step_degrees
 
     angle = _current_angle
-    # Move in increments until within one step of the target.
+
     while abs(target_angle - angle) > abs(step):
+
+        # Optional STOP check.
+        if stop_check is not None:
+
+            try:
+
+                if stop_check():
+                    return True
+
+            except Exception:
+
+                # A failed stop check must never break
+                # the servo movement.
+                pass
+
         angle += step
+
+        # SAME command to BOTH servos.
         _set_angle(angle)
-        utime.sleep_ms(step_delay_ms)
 
-    # Final precise move to the exact target angle.
-    _set_angle(target_angle)
+        utime.sleep_ms(
+            step_delay_ms
+        )
 
+    # Final exact position.
+    _set_angle(
+        target_angle
+    )
+
+    return False
+
+
+# --------------------------------------------------------------------------
+# NORMAL MOVEMENT FUNCTIONS
+# --------------------------------------------------------------------------
 
 def move_left():
-    """Move the servo to 0 degrees (left)."""
-    _move_smooth(_MIN_ANGLE)
+    """
+    Move BOTH sanitation servos to LEFT.
+    """
+
+    _move_smooth(
+        _MIN_ANGLE
+    )
 
 
 def move_center():
-    """Move the servo to 90 degrees (center)."""
-    _move_smooth(_CENTER_ANGLE)
+    """
+    Move BOTH sanitation servos to CENTER.
+    """
+
+    _move_smooth(
+        _CENTER_ANGLE
+    )
 
 
 def move_right():
-    """Move the servo to 180 degrees (right)."""
-    _move_smooth(_MAX_ANGLE)
-
-
-def sweep(duration=5):
     """
-    Continuously sweep the servo left <-> right for the given duration,
-    moving smoothly in small angle increments. Returns the servo to
-    center (90 degrees) once finished.
-
-    Args:
-        duration (int or float): Approximate total sweep duration, in
-            seconds. Defaults to 5 seconds.
+    Move BOTH sanitation servos to RIGHT.
     """
+
+    _move_smooth(
+        _MAX_ANGLE
+    )
+
+
+# --------------------------------------------------------------------------
+# SANITATION SWEEP
+# --------------------------------------------------------------------------
+
+def sweep(
+    duration=5,
+    stop_check=None
+):
+    """
+    Sweep BOTH MG90S servos left <-> right.
+
+    NORMAL CALL:
+        sweep()
+
+        Existing behavior is preserved.
+
+    MANUAL OVERRIDE CALL:
+        sweep(stop_check=...)
+
+        Same movement pattern, but the active manual sanitation
+        state is checked while the sweep is running.
+
+        If STOP is detected:
+            - BOTH servos return to CENTER.
+            - The cycle ends.
+            - Returns True.
+
+    Returns:
+        True  -> manually stopped.
+        False -> completed normally.
+    """
+
     start_time_ms = utime.ticks_ms()
-    duration_ms = int(duration * 1000)
 
-    # Start from the left.
-    move_left()
+    duration_ms = int(
+        duration * 1000
+    )
+
+
+    # --------------------------------------------------------------
+    # Start from LEFT.
+    # --------------------------------------------------------------
+
+    stopped = _move_smooth(
+        _MIN_ANGLE,
+        stop_check=stop_check
+    )
+
+    if stopped:
+
+        _move_smooth(
+            _CENTER_ANGLE
+        )
+
+        return True
+
 
     going_right = True
-    while utime.ticks_diff(utime.ticks_ms(), start_time_ms) < duration_ms:
+
+
+    # --------------------------------------------------------------
+    # Main sweep
+    # --------------------------------------------------------------
+
+    while (
+        utime.ticks_diff(
+            utime.ticks_ms(),
+            start_time_ms
+        ) < duration_ms
+    ):
+
         if going_right:
-            move_right()
+
+            stopped = _move_smooth(
+                _MAX_ANGLE,
+                stop_check=stop_check
+            )
+
         else:
-            move_left()
+
+            stopped = _move_smooth(
+                _MIN_ANGLE,
+                stop_check=stop_check
+            )
+
+
+        # ----------------------------------------------------------
+        # Manual STOP detected.
+        # ----------------------------------------------------------
+
+        if stopped:
+
+            # SAFETY:
+            # Always return BOTH servos to CENTER.
+            _move_smooth(
+                _CENTER_ANGLE
+            )
+
+            return True
+
+
         going_right = not going_right
 
-    # Always finish centered.
-    move_center()
 
+    # --------------------------------------------------------------
+    # Normal completion.
+    # --------------------------------------------------------------
+
+    _move_smooth(
+        _CENTER_ANGLE
+    )
+
+    return False
+
+
+# --------------------------------------------------------------------------
+# STANDALONE TEST
+# --------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("Starting MG90S Sweep Test...")
+
+    print(
+        "Starting MG90S Dual Servo Sweep Test..."
+    )
+
+    # No stop_check supplied.
+    # Therefore this behaves exactly like the existing test.
     sweep()
-    print("Sweep Test Complete.")
+
+    print(
+        "MG90S Dual Servo Sweep Test Complete."
+    )
+
