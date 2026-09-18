@@ -40,6 +40,7 @@ The study covers the following:
 - Automated feeding based on scheduled feed dispensing.
 - Farmer input of pig population, age in days, and estimated weight.
 - Feeding recommendations based on predefined feeding references.
+- Centralized tracking of farmer records, feedback, and educational content through the admin system.
 
 ### Mobile Application Features
 
@@ -49,12 +50,12 @@ The study covers the following:
 - Manual Override Controls
 - Multi-Pen Management
 
-### Decision-Support Features
+### Website Application Features
 
-- Feeding and Sanitation Recommendations
-- Pig Support Guidelines
-- Estimated Market Value
-- Suggested Selling Period
+- Farmer Account and Records Management
+- Educational Content Management
+- Feedback and Ratings Monitoring
+- Market Trends and Price Tracking
 
 ### System Evaluation
 
@@ -93,7 +94,25 @@ The system will be evaluated based on:
 
 # Overall Description
 
-> *System Flowchart will be added here.*
+## Data FLow in Farmer Side (App)
+
+<p align="center">
+  <img src="images/flowchart-oinkmate.drawio.png" width="350">
+</p>
+
+---
+
+## Data FLow in Admin Side (Website)
+
+<p align="center">
+  <img src="images/admin-flowchart.drawio.png" width="700">
+</p>
+
+## System Architecture
+
+<p align="center">
+  <img src="images/system_archiss.png" width="700">
+</ps
 
 ---
 
@@ -192,17 +211,11 @@ The system will be evaluated based on:
 - Filter Feedback
 - Manage Feedback Status
 
-## Settings
+## Market Trends
 
-- Administrator Account Management
-- Change Password
-
-## Reports
-
-- View System Reports
-- Generate Summary Reports
-- Export Reports
-
+- Live Hog Price Tracking (National/All Regions)
+- Regional Price Filtering (e.g. NCR, CALABARZON, Central Luzon, Bicol, Western Visayas)
+- Regional Price Comparison (sorted highest to lowest)
 ---
 
 # OinkMate Hardware Prototype
@@ -246,12 +259,14 @@ The system will be evaluated based on:
 ### Software
 
 - React Native (Expo)
-- React (Admin Website)
+- React Vite(Admin Website)
 - TypeScript
 - PHP
 - MySQL
 - XAMPP
 - Git & GitHub
+- Vscode
+- Bruno and Postman
 
 ---
 
