@@ -52,7 +52,7 @@ type SanitationScheduleDetails = {
   pen_id: number;
   pen_name: string;
   schedule_time: string; // "07:00:00" (24-hour, from TIME column)
-  duration_minutes: number | null;
+  duration_seconds: number | null;
   trigger_temperature: number | null;
   status: string;
   pig_age_at_registration: number | string | null;
@@ -64,15 +64,11 @@ type SanitationScheduleDetails = {
   source: string | null;
 };
 
-const TIME_OPTIONS = [
-  '06:00 AM', '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM',
-  '12:00 PM', '01:00 PM', '03:00 PM', '05:00 PM', '06:00 PM',
-];
 
 // NOTE: dapat naka-open at naka-RUN yung ngrok tunnel mo (ngrok http <port>)
 // bago mo i-test 'to, kasi kailangan live yung URL na 'to para may sumagot.
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
 
 // Convert "08:00:00" (24-hour, from TIME column) -> "8:00 AM"
 function formatTo12Hour(time24h: string): string {
@@ -88,10 +84,15 @@ function formatTo12Hour(time24h: string): string {
   return `${hours}:${minutes} ${modifier}`;
 }
 
-// Convert "8:00 AM" -> "08:00:00" (24-hour, for the TIME column)
+// Validate manual time input such as "11:30 PM" or "7:05 am".
+function isValidTime12Hour(time12h: string): boolean {
+  return /^(0?[1-9]|1[0-2]):([0-5][0-9])\s*(AM|PM)$/i.test(time12h.trim());
+}
+
+// Convert "11:30 PM" -> "23:30:00" for the MySQL TIME column.
 function formatTo24Hour(time12h: string): string {
-  const match = time12h.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return time12h;
+  const match = time12h.trim().match(/^(0?[1-9]|1[0-2]):([0-5][0-9])\s*(AM|PM)$/i);
+  if (!match) return '';
 
   let hours = parseInt(match[1], 10);
   const minutes = match[2];
@@ -130,14 +131,14 @@ export default function EditScheduleScreen() {
   const [showPenDropdown, setShowPenDropdown] = useState(false);
 
   const [selectedTime, setSelectedTime] = useState('');
-  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
 
   // Feeding-only fields
   const [feedAmountPerPig, setFeedAmountPerPig] = useState('');
 
   // Sanitation-only fields
   const [triggerTemperature, setTriggerTemperature] = useState('');
-  const [sanitationDuration, setSanitationDuration] = useState('');
+  const [sanitationDurationMinutes, setSanitationDurationMinutes] = useState('');
+  const [sanitationDurationSeconds, setSanitationDurationSeconds] = useState('');
 
   const [status, setStatus] = useState<StatusType>('active');
 
@@ -199,11 +200,14 @@ export default function EditScheduleScreen() {
 
         setSelectedPenId(schedule.pen_id);
         setSelectedTime(formatTo12Hour(schedule.schedule_time));
-        setSanitationDuration(
-          schedule.duration_minutes === null || schedule.duration_minutes === undefined
-            ? ''
-            : String(schedule.duration_minutes)
-        );
+        if (schedule.duration_seconds === null || schedule.duration_seconds === undefined) {
+          setSanitationDurationMinutes('');
+          setSanitationDurationSeconds('');
+        } else {
+          const totalSeconds = schedule.duration_seconds;
+          setSanitationDurationMinutes(String(Math.floor(totalSeconds / 60)));
+          setSanitationDurationSeconds(String(totalSeconds % 60));
+        }
         setTriggerTemperature(
           schedule.trigger_temperature === null || schedule.trigger_temperature === undefined
             ? ''
@@ -262,7 +266,10 @@ export default function EditScheduleScreen() {
   }, [recordId, mode]);
 
   const handleUpdate = async () => {
-    if (!recordId || !selectedPenId || !selectedTime) {
+    if (!recordId || !selectedPenId || !selectedTime.trim()) {
+      return;
+    }
+    if (!isValidTime12Hour(selectedTime)) {
       return;
     }
     if (mode === 'feeding' && !feedAmountPerPig) {
@@ -285,7 +292,8 @@ export default function EditScheduleScreen() {
               sanitation_id: Number(recordId),
               pen_id: selectedPenId,
               schedule_time: formatTo24Hour(selectedTime),
-              duration_minutes: sanitationDurationValue,
+              duration_seconds:
+                Number(sanitationDurationMinutes) * 60 + Number(sanitationDurationSeconds),
               trigger_temperature: triggerTemperature ? parseFloat(triggerTemperature) : null,
               status,
             }
@@ -326,12 +334,17 @@ export default function EditScheduleScreen() {
     }
   };
 
-  const sanitationDurationValue = Number(sanitationDuration);
+  const sanitationDurationMinutesValue = Number(sanitationDurationMinutes);
+  const sanitationDurationSecondsValue = Number(sanitationDurationSeconds);
   const isSanitationDurationValid =
-    sanitationDuration.trim() !== '' &&
-    Number.isInteger(sanitationDurationValue) &&
-    sanitationDurationValue >= 1 &&
-    sanitationDurationValue <= 30;
+    sanitationDurationMinutes.trim() !== '' &&
+    sanitationDurationSeconds.trim() !== '' &&
+    Number.isInteger(sanitationDurationMinutesValue) &&
+    Number.isInteger(sanitationDurationSecondsValue) &&
+    sanitationDurationMinutesValue >= 0 &&
+    sanitationDurationSecondsValue >= 0 &&
+    sanitationDurationSecondsValue <= 59 &&
+    sanitationDurationMinutesValue * 60 + sanitationDurationSecondsValue > 0;
 
   const canSubmit =
     !loading &&
@@ -358,7 +371,7 @@ export default function EditScheduleScreen() {
         </View>
       ) : loadError ? (
         <View style={styles.loadingSection}>
-          <Ionicons name="alert-circle-outline" size={28} color="#D96C8D" />
+          <Ionicons name="alert-circle-outline" size={28} color="#C62828" />
           <Text style={styles.errorText}>{loadError}</Text>
         </View>
       ) : (
@@ -380,7 +393,7 @@ export default function EditScheduleScreen() {
                 onPress={() => setShowPenDropdown(!showPenDropdown)}
                 activeOpacity={0.85}
               >
-                <Ionicons name="paw-outline" size={15} color="#4A5C57" />
+                <Ionicons name="paw-outline" size={15} color="#2F5D50" />
                 <Text style={styles.dropdownTriggerText}>
                   {selectedPen?.pen_name ?? 'Select Pig Pen'}
                 </Text>
@@ -446,7 +459,9 @@ export default function EditScheduleScreen() {
           </View>
 
           {/* Feeding Recommendation — generated by feeding_helper.php on the backend.
-              Display-only; nothing here is calculated in React Native. */}
+              Display-only; nothing here is calculated in React Native.
+              Feeding schedules only. */}
+          {mode === 'feeding' && (
           <View style={styles.card}>
             <View style={styles.cardLabelRow}>
               <Ionicons name="nutrition-outline" size={15} color="#2F5D50" />
@@ -469,6 +484,7 @@ export default function EditScheduleScreen() {
               </View>
             </View>
           </View>
+          )}
 
           {/* Schedule Time */}
           <View style={styles.card}>
@@ -478,38 +494,23 @@ export default function EditScheduleScreen() {
                 {mode === 'sanitation' ? 'Sanitation Time' : 'Feeding Time'}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.dropdownTrigger}
-              onPress={() => setShowTimeDropdown(!showTimeDropdown)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="alarm-outline" size={15} color="#4A5C57" />
-              <Text style={styles.dropdownTriggerText}>{selectedTime}</Text>
-              <Ionicons
-                name={showTimeDropdown ? 'chevron-up' : 'chevron-down'}
-                size={15}
-                color="#8A9994"
+            <View style={styles.timeInputWrapper}>
+              <Ionicons name="alarm-outline" size={15} color="#2F5D50" />
+              <TextInput
+                style={styles.timeInput}
+                placeholder="e.g. 11:00 PM"
+                placeholderTextColor="#B0C0BC"
+                value={selectedTime}
+                onChangeText={setSelectedTime}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                keyboardType="default"
+                maxLength={8}
               />
-            </TouchableOpacity>
-            {showTimeDropdown && (
-              <View style={styles.dropdownMenu}>
-                {TIME_OPTIONS.map((time) => (
-                  <TouchableOpacity
-                    key={time}
-                    style={[styles.dropdownItem, selectedTime === time && styles.dropdownItemActive]}
-                    onPress={() => { setSelectedTime(time); setShowTimeDropdown(false); }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.dropdownItemText, selectedTime === time && styles.dropdownItemTextActive]}>
-                      {time}
-                    </Text>
-                    {selectedTime === time && (
-                      <Ionicons name="checkmark" size={14} color="#2F5D50" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            </View>
+            <Text style={styles.helperText}>
+              Use the format h:mm AM/PM (e.g. 11:30 PM).
+            </Text>
           </View>
 
           {/* Feed Amount Per Pig — feeding schedules only */}
@@ -528,15 +529,11 @@ export default function EditScheduleScreen() {
                 onChangeText={setFeedAmountPerPig}
               />
 
-              {/* Auto-computed totals */}
+              {/* Auto-computed total */}
               <View style={styles.infoRow}>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoLabel}>Total Feed Required (kg)</Text>
                   <Text style={styles.infoValue}>{totalFeedRequired.toFixed(2)}</Text>
-                </View>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoLabel}>Feed Per Container (kg)</Text>
-                  <Text style={styles.infoValue}>{feedPerContainer.toFixed(2)}</Text>
                 </View>
               </View>
             </View>
@@ -565,19 +562,35 @@ export default function EditScheduleScreen() {
             <View style={styles.card}>
               <View style={styles.cardLabelRow}>
                 <Ionicons name="timer-outline" size={15} color="#2F5D50" />
-                <Text style={styles.cardLabel}>Sanitation Duration (minutes)</Text>
+                <Text style={styles.cardLabel}>Sanitation Duration</Text>
               </View>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. 15"
-                placeholderTextColor="#B0C0BC"
-                keyboardType="number-pad"
-                value={sanitationDuration}
-                onChangeText={(text) => setSanitationDuration(text.replace(/[^0-9]/g, ''))}
-              />
+              <View style={styles.durationRow}>
+                <View style={styles.durationField}>
+                  <Text style={styles.durationFieldLabel}>Minutes</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 2"
+                    placeholderTextColor="#B0C0BC"
+                    keyboardType="number-pad"
+                    value={sanitationDurationMinutes}
+                    onChangeText={(text) => setSanitationDurationMinutes(text.replace(/[^0-9]/g, ''))}
+                  />
+                </View>
+                <View style={styles.durationField}>
+                  <Text style={styles.durationFieldLabel}>Seconds</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 30"
+                    placeholderTextColor="#B0C0BC"
+                    keyboardType="number-pad"
+                    value={sanitationDurationSeconds}
+                    onChangeText={(text) => setSanitationDurationSeconds(text.replace(/[^0-9]/g, ''))}
+                  />
+                </View>
+              </View>
               {!isSanitationDurationValid && (
                 <Text style={styles.errorText}>
-                  Duration is required and must be a whole number between 1 and 30 minutes.
+                  Duration is required — seconds must be 0–59, and the total must be greater than 0.
                 </Text>
               )}
             </View>
@@ -714,10 +727,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.2,
   },
   headerPlaceholder: {
@@ -733,10 +746,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
 
@@ -770,10 +783,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Segmented Control */
@@ -810,10 +823,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   segmentText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#6B8A82',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   segmentTextActive: {
     color: '#FFFFFF',
@@ -839,10 +852,10 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownMenu: {
     backgroundColor: '#FFFFFF',
@@ -869,14 +882,57 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF7F1',
   },
   dropdownItemText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownItemTextActive: {
     color: '#2F5D50',
     fontWeight: '700',
+  },
+
+  /* Manual time input */
+  timeInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F7F8F9',
+    borderRadius: 14,
+    paddingVertical: 3,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E2EDEA',
+  },
+  timeInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A2D27',
+    fontFamily: 'Arial',
+  },
+  helperText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#8A9994',
+    fontFamily: 'Arial',
+  },
+
+  /* Sanitation Duration (Minutes / Seconds) row */
+  durationRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  durationField: {
+    flex: 1,
+    gap: 6,
+  },
+  durationFieldLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4A5C57',
+    fontFamily: 'Arial',
   },
 
   /* Text Input */
@@ -885,10 +941,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     borderWidth: 1,
     borderColor: '#E2EDEA',
   },
@@ -909,16 +965,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   infoLabel: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '600',
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Primary Button */
@@ -941,10 +997,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   bottomSpacer: {
@@ -976,10 +1032,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   successTitle: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
   successDoneButton: {

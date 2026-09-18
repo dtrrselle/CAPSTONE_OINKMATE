@@ -249,7 +249,7 @@ export default function SignUp() {
     setLoading(true);
     try {
       const response = await fetch(
-        'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api/farmer_register.php',
+        'https://oinkmate.online/oinkmate-api/api/farmer_register.php',
         {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },

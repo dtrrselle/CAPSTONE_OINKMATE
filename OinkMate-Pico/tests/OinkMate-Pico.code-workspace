@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../../../xampp/htdocs/oinkmate-api"
+		}
+	],
+	"settings": {
+		"python.languageServer": "Pylance"
+	}
+}

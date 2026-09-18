@@ -59,8 +59,8 @@ const PenFilter: React.FC<PenFilterProps> = ({
             {option.icon && (
               <Ionicons
                 name={option.icon}
-                size={13}
-                color={isSelected ? '#FFFFFF' : '#6B8A82'}
+                size={14}
+                color={isSelected ? '#FFFFFF' : '#5F6D69'}
                 style={styles.chipIcon}
               />
             )}
@@ -83,9 +83,9 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 38,
+    height: 40,
     backgroundColor: '#FFFFFF',
-    borderRadius: 19,
+    borderRadius: 20,
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#E2EDEA',
@@ -99,10 +99,10 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#6B8A82',
-    fontFamily: 'Inter',
+    color: '#5F6D69',
+    fontFamily: 'Arial',
   },
   chipTextSelected: {
     color: '#FFFFFF',

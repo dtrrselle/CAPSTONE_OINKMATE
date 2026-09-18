@@ -32,28 +32,30 @@ type PigPen = {
   source: string;
 };
 
-const TIME_OPTIONS = [
-  '06:00 AM', '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM',
-  '12:00 PM', '01:00 PM', '03:00 PM', '05:00 PM', '06:00 PM',
-];
 
 // NOTE: dapat naka-open at naka-RUN yung ngrok tunnel mo (ngrok http <port>)
 // bago mo i-test 'to, kasi kailangan live yung URL na 'to para may sumagot.
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
 
-// Convert "08:00 AM" -> "08:00:00" (24-hour, for TIME columns sa DB)
+// Validate manual time input such as "11:30 PM" or "7:05 am".
+function isValidTime12Hour(time12h: string): boolean {
+  return /^(0?[1-9]|1[0-2]):([0-5][0-9])\s*(AM|PM)$/i.test(time12h.trim());
+}
+
+// Convert "11:30 PM" -> "23:30:00" for the MySQL TIME column.
 function convertTo24Hour(time12h: string): string {
-  const [time, modifier] = time12h.split(' ');
-  const [hoursStr, minutesStr] = time.split(':');
-  let hours = parseInt(hoursStr, 10);
+  const match = time12h.trim().match(/^(0?[1-9]|1[0-2]):([0-5][0-9])\s*(AM|PM)$/i);
+  if (!match) return '';
+
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const modifier = match[3].toUpperCase();
 
   if (modifier === 'PM' && hours !== 12) hours += 12;
   if (modifier === 'AM' && hours === 12) hours = 0;
 
-  const hh = String(hours).padStart(2, '0');
-  const mm = minutesStr.padStart(2, '0');
-  return `${hh}:${mm}:00`;
+  return `${String(hours).padStart(2, '0')}:${minutes}:00`;
 }
 
 export default function AddScheduleScreen() {
@@ -69,8 +71,7 @@ export default function AddScheduleScreen() {
   const [showPenDropdown, setShowPenDropdown] = useState(false);
 
   // Feeding Time / Schedule Time (feeding_schedules.feeding_time / sanitation schedule time)
-  const [selectedTime, setSelectedTime] = useState('08:00 AM');
-  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [selectedTime, setSelectedTime] = useState('');
 
   // Recommended Feed Amount (feeding_schedules.recommended_feed_amount)
   // NOTE: label in the UI is "Feed Amount Per Pig (kg)"; state/payload key kept
@@ -94,8 +95,10 @@ export default function AddScheduleScreen() {
   // Trigger Temperature (Optional; sanitation_schedules.trigger_temperature)
   const [triggerTemperature, setTriggerTemperature] = useState('');
 
-  // Sanitation Duration (minutes) (sanitation_schedules.duration_minutes)
-  const [sanitationDuration, setSanitationDuration] = useState('15');
+  // Sanitation Duration (sanitation_schedules.duration_seconds — stored as total seconds)
+  // Farmer enters Minutes + Seconds separately; combined into duration_seconds before saving.
+  const [sanitationDurationMinutes, setSanitationDurationMinutes] = useState('15');
+  const [sanitationDurationSeconds, setSanitationDurationSeconds] = useState('0');
 
   // Status (feeding_schedules.status / sanitation schedule status)
   const [status, setStatus] = useState<StatusType>('active');
@@ -232,7 +235,8 @@ export default function AddScheduleScreen() {
 
   const validate = (): string | null => {
     if (!selectedPen) return 'Please select a pig pen';
-    if (!selectedTime) return 'Please select a time';
+    if (!selectedTime.trim()) return 'Please enter a time';
+    if (!isValidTime12Hour(selectedTime)) return 'Please enter the time in the format h:mm AM/PM (e.g. 11:30 PM)';
 
     if (scheduleType === 'feeding') {
       if (!recommendedFeedAmount.trim()) {
@@ -248,17 +252,28 @@ export default function AddScheduleScreen() {
         return 'Trigger temperature must be a number';
       }
 
-      if (!sanitationDuration.trim()) {
+      if (!sanitationDurationMinutes.trim() || !sanitationDurationSeconds.trim()) {
         return 'Please enter the sanitation duration';
       }
-      const durationValue = Number(sanitationDuration);
+      const minutesValue = Number(sanitationDurationMinutes);
+      const secondsValue = Number(sanitationDurationSeconds);
       if (
-        isNaN(durationValue) ||
-        !Number.isInteger(durationValue) ||
-        durationValue < 1 ||
-        durationValue > 30
+        isNaN(minutesValue) ||
+        !Number.isInteger(minutesValue) ||
+        minutesValue < 0
       ) {
-        return 'Sanitation duration must be a whole number between 1 and 30 minutes';
+        return 'Sanitation duration minutes must be a whole number, 0 or greater';
+      }
+      if (
+        isNaN(secondsValue) ||
+        !Number.isInteger(secondsValue) ||
+        secondsValue < 0 ||
+        secondsValue > 59
+      ) {
+        return 'Sanitation duration seconds must be a whole number between 0 and 59';
+      }
+      if (minutesValue * 60 + secondsValue <= 0) {
+        return 'Sanitation duration must be greater than 0 seconds';
       }
     }
 
@@ -300,7 +315,7 @@ export default function AddScheduleScreen() {
           : {
               pen_id,
               schedule_time: convertTo24Hour(selectedTime),
-              duration_minutes: Number(sanitationDuration),
+              duration_seconds: Number(sanitationDurationMinutes) * 60 + Number(sanitationDurationSeconds),
               trigger_temperature: triggerTemperature.trim()
                 ? parseFloat(triggerTemperature)
                 : null,
@@ -322,8 +337,9 @@ export default function AddScheduleScreen() {
           setRecommendedFeedAmount('');
         }
         if (scheduleType === 'sanitation') {
-          // Reset Sanitation-specific form field after a successful save.
-          setSanitationDuration('15');
+          // Reset Sanitation-specific form fields after a successful save.
+          setSanitationDurationMinutes('15');
+          setSanitationDurationSeconds('0');
         }
         setShowSuccessModal(true);
       } else {
@@ -409,7 +425,7 @@ export default function AddScheduleScreen() {
               activeOpacity={0.85}
               disabled={loadingPens}
             >
-              <Ionicons name="paw-outline" size={15} color="#4A5C57" />
+              <Ionicons name="paw-outline" size={15} color="#2F5D50" />
               {loadingPens ? (
                 <ActivityIndicator size="small" color="#2F5D50" />
               ) : (
@@ -485,7 +501,7 @@ export default function AddScheduleScreen() {
 
         {/* Feeding Recommendation — generated by feeding_helper.php on the backend.
             Display-only; nothing here is calculated in React Native. */}
-        {selectedPenId && (
+        {scheduleType === 'feeding' && selectedPenId && (
           <View style={styles.card}>
             <View style={styles.cardLabelRow}>
               <Ionicons name="nutrition-outline" size={15} color="#2F5D50" />
@@ -518,38 +534,23 @@ export default function AddScheduleScreen() {
               {scheduleType === 'feeding' ? 'Feeding Time' : 'Schedule Time'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.dropdownTrigger}
-            onPress={() => setShowTimeDropdown(!showTimeDropdown)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="alarm-outline" size={15} color="#4A5C57" />
-            <Text style={styles.dropdownTriggerText}>{selectedTime}</Text>
-            <Ionicons
-              name={showTimeDropdown ? 'chevron-up' : 'chevron-down'}
-              size={15}
-              color="#8A9994"
+          <View style={styles.timeInputWrapper}>
+            <Ionicons name="alarm-outline" size={15} color="#2F5D50" />
+            <TextInput
+              style={styles.timeInput}
+              placeholder="e.g. 11:00 PM"
+              placeholderTextColor="#B0C0BC"
+              value={selectedTime}
+              onChangeText={setSelectedTime}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              keyboardType="default"
+              maxLength={8}
             />
-          </TouchableOpacity>
-          {showTimeDropdown && (
-            <View style={styles.dropdownMenu}>
-              {TIME_OPTIONS.map((time) => (
-                <TouchableOpacity
-                  key={time}
-                  style={[styles.dropdownItem, selectedTime === time && styles.dropdownItemActive]}
-                  onPress={() => { setSelectedTime(time); setShowTimeDropdown(false); }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.dropdownItemText, selectedTime === time && styles.dropdownItemTextActive]}>
-                    {time}
-                  </Text>
-                  {selectedTime === time && (
-                    <Ionicons name="checkmark" size={14} color="#2F5D50" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          </View>
+          <Text style={styles.optionalLabel}>
+            Use the format h:mm AM/PM (e.g. 11:30 PM).
+          </Text>
         </View>
 
         {/* Feeding-only: Feed Amount Per Pig */}
@@ -611,23 +612,39 @@ export default function AddScheduleScreen() {
           </View>
         )}
 
-        {/* Sanitation-only: Sanitation Duration (minutes) */}
+        {/* Sanitation-only: Sanitation Duration (Minutes + Seconds) */}
         {scheduleType === 'sanitation' && (
           <View style={styles.card}>
             <View style={styles.cardLabelRow}>
               <Ionicons name="timer-outline" size={15} color="#2F5D50" />
-              <Text style={styles.cardLabel}>Sanitation Duration (minutes)</Text>
+              <Text style={styles.cardLabel}>Sanitation Duration</Text>
             </View>
-            <TextInput
-              style={styles.textField}
-              placeholder="e.g. 15"
-              placeholderTextColor="#B0C0BC"
-              keyboardType="number-pad"
-              value={sanitationDuration}
-              onChangeText={(text) => setSanitationDuration(text.replace(/[^0-9]/g, ''))}
-            />
+            <View style={styles.durationRow}>
+              <View style={styles.durationField}>
+                <Text style={styles.durationFieldLabel}>Minutes</Text>
+                <TextInput
+                  style={styles.textField}
+                  placeholder="e.g. 2"
+                  placeholderTextColor="#B0C0BC"
+                  keyboardType="number-pad"
+                  value={sanitationDurationMinutes}
+                  onChangeText={(text) => setSanitationDurationMinutes(text.replace(/[^0-9]/g, ''))}
+                />
+              </View>
+              <View style={styles.durationField}>
+                <Text style={styles.durationFieldLabel}>Seconds</Text>
+                <TextInput
+                  style={styles.textField}
+                  placeholder="e.g. 30"
+                  placeholderTextColor="#B0C0BC"
+                  keyboardType="number-pad"
+                  value={sanitationDurationSeconds}
+                  onChangeText={(text) => setSanitationDurationSeconds(text.replace(/[^0-9]/g, ''))}
+                />
+              </View>
+            </View>
             <Text style={styles.optionalLabel}>
-              Whole numbers only, between 1 and 30 minutes.
+              Whole numbers only. Seconds must be between 0 and 59. Total duration must be greater than 0.
             </Text>
           </View>
         )}
@@ -807,7 +824,7 @@ export default function AddScheduleScreen() {
         <Pressable style={modalStyles.overlay} onPress={() => setShowErrorModal(false)}>
           <Pressable style={modalStyles.modal} onPress={() => {}}>
             <View style={[modalStyles.iconWrap, modalStyles.iconWrapError]}>
-              <Ionicons name="alert-circle-outline" size={28} color="#D96C8D" />
+              <Ionicons name="alert-circle-outline" size={28} color="#C62828" />
             </View>
 
             <View style={modalStyles.textBlock}>
@@ -857,10 +874,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.2,
   },
   headerPlaceholder: {
@@ -897,13 +914,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   optionalLabel: {
-    fontSize: 12,
+    fontFamily: 'Arial',
+    fontSize: 15,
     fontWeight: '500',
     color: '#8A9994',
   },
@@ -942,10 +960,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   segmentText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#6B8A82',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   segmentTextActive: {
     color: '#FFFFFF',
@@ -971,10 +989,10 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownMenu: {
     backgroundColor: '#FFFFFF',
@@ -1001,14 +1019,51 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF7F1',
   },
   dropdownItemText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownItemTextActive: {
     color: '#2F5D50',
     fontWeight: '700',
+  },
+
+  /* Manual time input */
+  timeInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F7F8F9',
+    borderRadius: 14,
+    paddingVertical: 3,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E2EDEA',
+  },
+  timeInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A2D27',
+    fontFamily: 'Arial',
+  },
+
+  /* Sanitation Duration (Minutes / Seconds) row */
+  durationRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  durationField: {
+    flex: 1,
+    gap: 6,
+  },
+  durationFieldLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4A5C57',
+    fontFamily: 'Arial',
   },
 
   /* Single-line text field (Recommended Feed Amount, Trigger Temperature) */
@@ -1017,9 +1072,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    fontSize: 13,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     borderWidth: 1,
     borderColor: '#E2EDEA',
   },
@@ -1040,16 +1095,16 @@ const styles = StyleSheet.create({
     borderColor: '#E2EDEA',
   },
   infoRowLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   infoRowValue: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#2F5D50',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Notes */
@@ -1058,9 +1113,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    fontSize: 13,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     borderWidth: 1,
     borderColor: '#E2EDEA',
     minHeight: 80,
@@ -1083,10 +1138,10 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   primaryButtonDisabled: {
     opacity: 0.7,
@@ -1130,12 +1185,14 @@ const modalStyles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 18,
+    fontFamily: 'Arial',
+    fontSize: 20,
     fontWeight: '800',
     color: '#1A2D27',
   },
   subtitle: {
-    fontSize: 13,
+    fontFamily: 'Arial',
+    fontSize: 16,
     textAlign: 'center',
     color: '#8A9994',
     lineHeight: 20,

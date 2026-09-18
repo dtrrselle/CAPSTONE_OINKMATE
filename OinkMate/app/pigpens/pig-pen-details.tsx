@@ -10,8 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
-const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+const API_BASE_URL = 'https://oinkmate.online/oinkmate-api';
 
 interface PigPen {
   pen_id: number;
@@ -25,6 +24,7 @@ interface PigPen {
   currentAge: string;
   growthStage: string;
   feedType: string;
+  actualFeedType: string;
   recommendedFeed: number;
   source: string;
 }
@@ -85,7 +85,7 @@ export default function PigPenDetails() {
     <View style={styles.screen}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)/pig-pens')} activeOpacity={0.8}>
           <Ionicons name="chevron-back" size={20} color="#2F5D50" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pig Pen Details</Text>
@@ -189,6 +189,11 @@ export default function PigPenDetails() {
             </View>
             <View style={styles.infoDivider} />
             <View style={styles.infoRow}>
+              <Text style={styles.infoKey}>Actual Feed Type</Text>
+              <Text style={styles.infoValue}>{pigPen.actualFeedType}</Text>
+            </View>
+            <View style={styles.infoDivider} />
+            <View style={styles.infoRow}>
               <Text style={styles.infoKey}>Last Updated</Text>
               <Text style={styles.infoValue}>{formatDate(pigPen.updated_at)}</Text>
             </View>
@@ -256,10 +261,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.2,
   },
   headerPlaceholder: {
@@ -275,16 +280,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorText: {
-    fontSize: 14,
+    fontSize: 17,
     color: '#B3261E',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '600',
     textAlign: 'center',
   },
   emptyText: {
-    fontSize: 15,
+    fontSize: 18,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -330,16 +335,16 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   penName: {
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.3,
   },
   penSubtext: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '500',
   },
   chipsRow: {
@@ -358,10 +363,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF7F1',
   },
   chipTextGreen: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '700',
     color: '#2F5D50',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Card */
@@ -384,10 +389,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Info rows */
@@ -398,15 +403,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   infoKey: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '500',
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '700',
   },
   infoDivider: {
@@ -416,9 +421,9 @@ const styles = StyleSheet.create({
 
   /* Description */
   descriptionText: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     lineHeight: 20,
   },
 

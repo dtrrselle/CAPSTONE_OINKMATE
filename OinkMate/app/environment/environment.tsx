@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -24,8 +24,10 @@ const POLL_INTERVAL_MS = 8000;
 
 // ─── API Config ──────────────────────────────────────────────────────────────
 // Same host used by signin.tsx / signup.tsx (farmer_login.php / farmer_register.php).
-const API_BASE_URL = 'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api';
+const API_BASE_URL = 'https://oinkmate.online/oinkmate-api/api';
 const ENVIRONMENT_ENDPOINT = `${API_BASE_URL}/iot/environment/get_latest_environment.php`;
+// Existing history endpoint (same API group as the live-reading endpoint above).
+const HISTORY_ENDPOINT = `${API_BASE_URL}/iot/environment/get_environment._history.php`;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -92,6 +94,14 @@ const METRIC_DEFS: MetricDef[] = [
   },
 ];
 
+// Full-length sensor names used in the Environmental Trends section (the
+// mini stat cards above keep the shorter METRIC_DEFS.label as-is).
+const SENSOR_FULL_LABEL: Record<MetricDef['id'], string> = {
+  temperature: 'Temperature',
+  humidity: 'Humidity',
+  ammonia: 'Ammonia',
+};
+
 const SEVERITY_DOT: Record<Severity, string> = {
   ok: '#2ECC71',
   warn: '#F39C12',
@@ -137,6 +147,20 @@ function computeFeedSeverity(value: number | null): Severity {
   if (value <= 20) return 'critical';
   if (value <= 50) return 'warn';
   return 'ok';
+}
+
+// Hardware now reports only 2 feed containers. The main Feed value is the
+// average of Container 1 and Container 2 only - never feed_level_3, and
+// never the backend's overall_level (which may still be computed from 3
+// readings until the API is updated). Returns null (not NaN) whenever
+// either container reading is unavailable, so the existing "No Data"
+// handling takes over.
+function computeAverageFeedLevel(
+  feedLevel1: number | null,
+  feedLevel2: number | null
+): number | null {
+  if (feedLevel1 === null || feedLevel2 === null) return null;
+  return (feedLevel1 + feedLevel2) / 2;
 }
 
 const FEED_VALUE_COLOR = (s: Severity) =>
@@ -217,6 +241,165 @@ async function fetchPigPens(farmerId: string): Promise<PigPen[]> {
 
   const rawPens = Array.isArray(json?.data) ? json.data : [];
   return rawPens.map(normalizePen);
+}
+
+// ─── History / Environmental Trends Helpers ───────────────────────────────────
+// The history section is independent from the live-polling pen cards above:
+// it fetches raw readings for one selected pen from the existing
+// get_environment._history.php endpoint, then groups/averages them on the
+// client into a small number of chart-friendly points.
+
+type RangeOption = '24h' | '7d' | '30d';
+
+const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
+  { value: '24h', label: 'Last 24 Hours' },
+  { value: '7d', label: 'Last 7 Days' },
+  { value: '30d', label: 'Last 30 Days' },
+];
+
+const RANGE_LABELS: Record<RangeOption, string> = {
+  '24h': 'Last 24 Hours',
+  '7d': 'Last 7 Days',
+  '30d': 'Last 30 Days',
+};
+
+const RANGE_MS: Record<RangeOption, number> = {
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+};
+
+// Grouping interval per range, so the chart stays readable no matter how
+// many raw readings come back: hourly for 24h, 6-hour buckets for 7d, and
+// daily for 30d, as requested.
+const BUCKET_MS: Record<RangeOption, number> = {
+  '24h': 60 * 60 * 1000,
+  '7d': 6 * 60 * 60 * 1000,
+  '30d': 24 * 60 * 60 * 1000,
+};
+
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+interface HistoryRecord {
+  temperature: number | null;
+  humidity: number | null;
+  ammonia: number | null;
+  recorded_at: string | null;
+}
+
+interface TrendPoint {
+  value: number;
+  label: string;
+}
+
+// MySQL DATETIME strings ("YYYY-MM-DD HH:MM:SS") aren't reliably parsed by
+// `new Date()` on every JS engine unless converted to an ISO-ish string first.
+function parseRecordedAt(value: string | null): number | null {
+  if (!value) return null;
+  const iso = value.includes('T') ? value : value.replace(' ', 'T');
+  const t = new Date(iso).getTime();
+  return isNaN(t) ? null : t;
+}
+
+function formatBucketLabel(timestampMs: number, range: RangeOption): string {
+  const d = new Date(timestampMs);
+  if (range === '24h') {
+    let hours = d.getHours();
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return `${hours}${suffix}`;
+  }
+  if (range === '7d') {
+    return WEEKDAY_LABELS[d.getDay()];
+  }
+  return `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`;
+}
+
+// Groups raw sensor readings into fixed-size time buckets and averages each
+// bucket. Buckets with zero readings are skipped entirely rather than
+// fabricated as zero/interpolated values, per requirements.
+function buildTrendPoints(
+  records: HistoryRecord[],
+  range: RangeOption,
+  sensor: MetricDef['id']
+): TrendPoint[] {
+  if (!records.length) return [];
+
+  const now = Date.now();
+  const rangeMs = RANGE_MS[range];
+  const bucketMs = BUCKET_MS[range];
+  const cutoff = now - rangeMs;
+  const numBuckets = Math.round(rangeMs / bucketMs);
+
+  const sums = new Array(numBuckets).fill(0);
+  const counts = new Array(numBuckets).fill(0);
+
+  records.forEach((r) => {
+    const t = parseRecordedAt(r.recorded_at);
+    if (t === null || t < cutoff || t > now) return;
+
+    const value = r[sensor];
+    if (value === null || value === undefined || isNaN(value)) return;
+
+    let idx = Math.floor((t - cutoff) / bucketMs);
+    if (idx < 0) idx = 0;
+    if (idx > numBuckets - 1) idx = numBuckets - 1;
+
+    sums[idx] += value;
+    counts[idx] += 1;
+  });
+
+  const points: TrendPoint[] = [];
+  for (let i = 0; i < numBuckets; i++) {
+    if (counts[i] === 0) continue;
+    const bucketEnd = cutoff + (i + 1) * bucketMs;
+    points.push({
+      value: sums[i] / counts[i],
+      label: formatBucketLabel(bucketEnd, range),
+    });
+  }
+  return points;
+}
+
+async function fetchPenHistory(penId: number): Promise<HistoryRecord[]> {
+  const url = `${HISTORY_ENDPOINT}?pen_id=${encodeURIComponent(String(penId))}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+    },
+  });
+
+  const bodyText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}: ${bodyText.slice(0, 200)}`);
+  }
+
+  let json: any;
+  try {
+    json = JSON.parse(bodyText);
+  } catch {
+    throw new Error(`Server did not return valid JSON: ${bodyText.slice(0, 200)}`);
+  }
+
+  if (json?.success === false) {
+    throw new Error(json?.message || 'Server reported an error.');
+  }
+
+  const rawRows = Array.isArray(json?.data) ? json.data : [];
+  return rawRows.map((row: any) => ({
+    temperature: numOrNull(row?.temperature),
+    humidity: numOrNull(row?.humidity),
+    ammonia: numOrNull(row?.ammonia),
+    recorded_at: row?.recorded_at ?? null,
+  }));
 }
 
 // ─── Mini Stat Card (Temperature / Humidity / Ammonia) ────────────────────────
@@ -306,7 +489,7 @@ function FeedMiniCard({
 
       {hasData ? (
         <Text style={[card.value, { color: valColor }]} numberOfLines={1} adjustsFontSizeToFit>
-          {overallLevel}
+          {overallLevel.toFixed(2)}
           <Text style={card.unit}>%</Text>
         </Text>
       ) : (
@@ -317,7 +500,15 @@ function FeedMiniCard({
 
       {hasData && (
         <View style={card.barTrack}>
-          <View style={[card.barFill, { width: `${overallLevel}%` as any, backgroundColor: barColor }]} />
+          <View
+            style={[
+              card.barFill,
+              {
+                width: `${Math.min(100, Math.max(0, overallLevel))}%` as any,
+                backgroundColor: barColor,
+              },
+            ]}
+          />
         </View>
       )}
 
@@ -349,12 +540,21 @@ function FeedContainerRow({ container }: { container: FeedContainer }) {
       <View style={feedPanel.rowHeader}>
         <Text style={feedPanel.containerName}>{container.name}</Text>
         <Text style={hasData ? feedPanel.containerPct : feedPanel.containerNoData}>
-          {hasData ? `${container.percentage}%` : 'No Data'}
+          {hasData
+            ? `${Math.min(100, Math.max(0, container.percentage as number)).toFixed(2)}%`
+            : 'No Data'}
         </Text>
       </View>
       {hasData && (
         <View style={feedPanel.barTrack}>
-          <View style={[feedPanel.barFill, { width: `${container.percentage}%` as any }]} />
+          <View
+            style={[
+              feedPanel.barFill,
+              {
+                width: `${Math.min(100, Math.max(0, container.percentage as number))}%` as any,
+              },
+            ]}
+          />
         </View>
       )}
     </View>
@@ -377,8 +577,13 @@ function PenSection({ pen }: { pen: PigPen }) {
   const containers: FeedContainer[] = [
     { name: 'Container 1', percentage: pen.feed_level_1 },
     { name: 'Container 2', percentage: pen.feed_level_2 },
-    { name: 'Container 3', percentage: pen.feed_level_3 },
   ];
+
+  const rawAverageFeedLevel = computeAverageFeedLevel(pen.feed_level_1, pen.feed_level_2);
+  const averageFeedLevel =
+    rawAverageFeedLevel === null
+      ? null
+      : Math.min(100, Math.max(0, rawAverageFeedLevel));
 
   const valuesAndStatus: Record<MetricDef['id'], { value: number | null; status: StatusLabel }> = {
     temperature: { value: pen.temperature, status: pen.temperature_status },
@@ -416,7 +621,7 @@ function PenSection({ pen }: { pen: PigPen }) {
           />
         ))}
         <FeedMiniCard
-          overallLevel={pen.overall_level}
+          overallLevel={averageFeedLevel}
           cardWidth={cardWidth}
           expanded={feedExpanded}
           onToggle={toggleFeed}
@@ -436,6 +641,117 @@ function PenSection({ pen }: { pen: PigPen }) {
   );
 }
 
+// ─── Trend Chart (dependency-free — plain Views, no chart/SVG library) ───────
+// Draws a simple line chart by rotating thin absolutely-positioned Views
+// between consecutive points. Kept intentionally lightweight since no chart
+// library was already present in the project.
+
+function TrendChart({ points, color }: { points: TrendPoint[]; color: string }) {
+  const [chartWidth, setChartWidth] = useState(0);
+  const CHART_HEIGHT = 140;
+
+  const values = points.map((p) => p.value);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (min === max) {
+    // Flat / single-value series — pad so the line doesn't collapse to 0 height.
+    min -= 1;
+    max += 1;
+  } else {
+    const pad = (max - min) * 0.12;
+    min -= pad;
+    max += pad;
+  }
+
+  const n = points.length;
+  const coords = points.map((p, i) => {
+    const x = n > 1 ? (i / (n - 1)) * chartWidth : chartWidth / 2;
+    const y = CHART_HEIGHT - ((p.value - min) / (max - min)) * CHART_HEIGHT;
+    return { x, y };
+  });
+
+  const maxLabels = Math.min(4, n);
+  const labelIndices = new Set<number>();
+  if (n === 1) {
+    labelIndices.add(0);
+  } else {
+    for (let i = 0; i < maxLabels; i++) {
+      labelIndices.add(Math.round((i / (maxLabels - 1)) * (n - 1)));
+    }
+  }
+
+  return (
+    <View>
+      <View
+        style={trend.plotArea}
+        onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}
+      >
+        {chartWidth > 0 && (
+          <>
+            {[0, 0.5, 1].map((frac) => (
+              <View
+                key={frac}
+                style={[trend.gridline, { top: CHART_HEIGHT * frac }]}
+              />
+            ))}
+
+            {coords.slice(0, -1).map((c, i) => {
+              const next = coords[i + 1];
+              const dx = next.x - c.x;
+              const dy = next.y - c.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              const angle = Math.atan2(dy, dx);
+              const midX = (c.x + next.x) / 2;
+              const midY = (c.y + next.y) / 2;
+              return (
+                <View
+                  key={i}
+                  style={[
+                    trend.chartLine,
+                    {
+                      left: midX - dist / 2,
+                      top: midY - 1,
+                      width: dist,
+                      backgroundColor: color,
+                      transform: [{ rotate: `${angle}rad` }],
+                    },
+                  ]}
+                />
+              );
+            })}
+
+            {coords.map((c, i) => (
+              <View
+                key={i}
+                style={[
+                  trend.chartDot,
+                  { left: c.x - 3, top: c.y - 3, backgroundColor: color },
+                ]}
+              />
+            ))}
+          </>
+        )}
+      </View>
+
+      {chartWidth > 0 && (
+        <View style={trend.axisRow}>
+          {points.map((p, i) =>
+            labelIndices.has(i) ? (
+              <Text
+                key={i}
+                style={[trend.axisLabel, { left: coords[i].x - 18, width: 36 }]}
+                numberOfLines={1}
+              >
+                {p.label}
+              </Text>
+            ) : null
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function Environment() {
@@ -448,6 +764,15 @@ export default function Environment() {
 
   const [filter, setFilter] = useState<string>('All Pens');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // ── Environmental Trends state (independent of the live-polling state above) ──
+  const [historyPenId, setHistoryPenId] = useState<number | null>(null);
+  const [historyRange, setHistoryRange] = useState<RangeOption>('7d');
+  const [historySensor, setHistorySensor] = useState<MetricDef['id']>('temperature');
+  const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyDropdown, setHistoryDropdown] = useState<'pen' | 'range' | 'sensor' | null>(null);
 
   const isMountedRef = useRef(true);
   const hasLoadedRef = useRef(false); // true once we've successfully loaded at least once
@@ -520,12 +845,74 @@ export default function Environment() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pens]);
 
+  // Default the Environmental Trends pen selector to the first available pen,
+  // and re-validate it if the previously selected pen disappears from fresh data.
+  useEffect(() => {
+    if (pens.length === 0) {
+      setHistoryPenId(null);
+      return;
+    }
+    setHistoryPenId((prev) => {
+      if (prev !== null && pens.some((p) => p.pen_id === prev)) return prev;
+      return pens[0].pen_id;
+    });
+  }, [pens]);
+
+  // Fetches raw history for the selected pen. Independent from the live
+  // polling above — it only re-fetches when the selected pen changes, not
+  // on every 8-second poll tick.
+  useEffect(() => {
+    if (historyPenId === null) {
+      setHistoryRecords([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setHistoryLoading(true);
+        setHistoryError(null);
+        const records = await fetchPenHistory(historyPenId);
+        if (!cancelled && isMountedRef.current) {
+          setHistoryRecords(records);
+          setHistoryLoading(false);
+        }
+      } catch (e: any) {
+        console.error('Environment history fetch failed:', e);
+        if (!cancelled && isMountedRef.current) {
+          setHistoryError(
+            e?.message ? `Unable to load history: ${e.message}` : 'Unable to load history.'
+          );
+          setHistoryRecords([]);
+          setHistoryLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [historyPenId]);
+
+  // Grouping/averaging is cheap client-side work, so it's derived with
+  // useMemo rather than re-fetched whenever only the range or sensor changes.
+  const chartPoints = useMemo(
+    () => buildTrendPoints(historyRecords, historyRange, historySensor),
+    [historyRecords, historyRange, historySensor]
+  );
+  const latestPointValue = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].value : null;
+
+  const selectedHistoryPen = pens.find((p) => p.pen_id === historyPenId) ?? null;
+  const selectedHistoryPenLabel = selectedHistoryPen ? selectedHistoryPen.pen_name : 'Select Pen';
+  const selectedSensorDef = METRIC_DEFS.find((m) => m.id === historySensor) ?? METRIC_DEFS[0];
+
   const allSeverities: Severity[] = [];
   pens.forEach((p) => {
     allSeverities.push(severityFromLabel('temperature', p.temperature_status));
     allSeverities.push(severityFromLabel('humidity', p.humidity_status));
     allSeverities.push(severityFromLabel('ammonia', p.ammonia_status));
-    allSeverities.push(computeFeedSeverity(p.overall_level));
+    allSeverities.push(computeFeedSeverity(computeAverageFeedLevel(p.feed_level_1, p.feed_level_2)));
   });
   const criticals = allSeverities.filter((s) => s === 'critical').length;
   const warnings = allSeverities.filter((s) => s === 'warn').length;
@@ -621,20 +1008,88 @@ export default function Environment() {
           <PenSection key={pen.pen_id} pen={pen} />
         ))}
 
-        {/* ── Future placeholder ── */}
-        <View style={styles.futureBox}>
-          <Text style={styles.futureTitle}>Coming Soon</Text>
-          {[
-            { label: 'Sensor History', icon: 'time-outline' as const },
-            { label: 'Environmental Charts', icon: 'bar-chart-outline' as const },
-            { label: 'Historical Logs', icon: 'document-text-outline' as const },
-          ].map((item) => (
-            <View key={item.label} style={styles.futureItem}>
-              <Ionicons name={item.icon} size={14} color="#8E8EA0" />
-              <Text style={styles.futureItemText}>{item.label}</Text>
+        {/* ── Environmental Trends ── */}
+        {!loading && !error && pens.length > 0 && (
+          <View style={trend.card}>
+            <Text style={trend.sectionTitle}>Environmental Trends</Text>
+
+            <View style={trend.filterRow}>
+              <TouchableOpacity
+                style={trend.filterChip}
+                onPress={() => setHistoryDropdown('pen')}
+                activeOpacity={0.8}
+              >
+                <Text style={trend.filterChipText} numberOfLines={1}>{selectedHistoryPenLabel}</Text>
+                <Ionicons name="chevron-down" size={13} color={GREEN} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={trend.filterChip}
+                onPress={() => setHistoryDropdown('range')}
+                activeOpacity={0.8}
+              >
+                <Text style={trend.filterChipText} numberOfLines={1}>{RANGE_LABELS[historyRange]}</Text>
+                <Ionicons name="chevron-down" size={13} color={GREEN} />
+              </TouchableOpacity>
             </View>
-          ))}
-        </View>
+
+            <View style={trend.filterRow}>
+              <TouchableOpacity
+                style={[trend.filterChip, trend.filterChipWide]}
+                onPress={() => setHistoryDropdown('sensor')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={selectedSensorDef.iconName} size={14} color={selectedSensorDef.iconColor} />
+                <Text style={trend.filterChipText}>{SENSOR_FULL_LABEL[historySensor]}</Text>
+                <Ionicons name="chevron-down" size={13} color={GREEN} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={trend.chartCard}>
+              <View style={trend.chartHeaderRow}>
+                <View>
+                  <Text style={trend.chartTitle}>
+                    {SENSOR_FULL_LABEL[historySensor]}
+                    {selectedSensorDef.unit ? ` (${selectedSensorDef.unit})` : ''}
+                  </Text>
+                  <Text style={trend.chartSubtitle}>
+                    {selectedHistoryPenLabel} · {RANGE_LABELS[historyRange]}
+                  </Text>
+                </View>
+                {latestPointValue !== null && (
+                  <Text style={[trend.latestValue, { color: selectedSensorDef.iconColor }]}>
+                    {latestPointValue.toFixed(2)}{selectedSensorDef.unit}
+                  </Text>
+                )}
+              </View>
+
+              {historyLoading && (
+                <View style={trend.stateBox}>
+                  <ActivityIndicator size="small" color={GREEN} />
+                  <Text style={trend.stateText}>Loading history…</Text>
+                </View>
+              )}
+
+              {!historyLoading && historyError && (
+                <View style={trend.stateBox}>
+                  <Ionicons name="alert-circle-outline" size={20} color="#C0392B" />
+                  <Text style={[trend.stateText, { color: '#C0392B' }]}>{historyError}</Text>
+                </View>
+              )}
+
+              {!historyLoading && !historyError && chartPoints.length === 0 && (
+                <View style={trend.stateBox}>
+                  <Ionicons name="analytics-outline" size={20} color="#8E8EA0" />
+                  <Text style={trend.stateText}>No history available for this period.</Text>
+                </View>
+              )}
+
+              {!historyLoading && !historyError && chartPoints.length > 0 && (
+                <TrendChart points={chartPoints} color={selectedSensorDef.iconColor} />
+              )}
+            </View>
+          </View>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -652,6 +1107,65 @@ export default function Environment() {
               >
                 <Text style={[styles.menuOptionText, filter === opt && styles.menuOptionTextActive]}>{opt}</Text>
                 {filter === opt && <Ionicons name="checkmark" size={16} color={GREEN} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Environmental Trends Filter Modal (pen / range / sensor) ── */}
+      <Modal
+        visible={historyDropdown !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHistoryDropdown(null)}
+      >
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setHistoryDropdown(null)}>
+          <View style={styles.menu}>
+            <Text style={styles.menuTitle}>
+              {historyDropdown === 'pen'
+                ? 'Select Pen'
+                : historyDropdown === 'range'
+                ? 'Select Date Range'
+                : 'Select Sensor'}
+            </Text>
+
+            {historyDropdown === 'pen' && pens.map((p) => (
+              <TouchableOpacity
+                key={p.pen_id}
+                style={[styles.menuOption, historyPenId === p.pen_id && styles.menuOptionActive]}
+                onPress={() => { setHistoryPenId(p.pen_id); setHistoryDropdown(null); }}
+              >
+                <Text style={[styles.menuOptionText, historyPenId === p.pen_id && styles.menuOptionTextActive]}>
+                  {p.pen_name}
+                </Text>
+                {historyPenId === p.pen_id && <Ionicons name="checkmark" size={16} color={GREEN} />}
+              </TouchableOpacity>
+            ))}
+
+            {historyDropdown === 'range' && RANGE_OPTIONS.map((r) => (
+              <TouchableOpacity
+                key={r.value}
+                style={[styles.menuOption, historyRange === r.value && styles.menuOptionActive]}
+                onPress={() => { setHistoryRange(r.value); setHistoryDropdown(null); }}
+              >
+                <Text style={[styles.menuOptionText, historyRange === r.value && styles.menuOptionTextActive]}>
+                  {r.label}
+                </Text>
+                {historyRange === r.value && <Ionicons name="checkmark" size={16} color={GREEN} />}
+              </TouchableOpacity>
+            ))}
+
+            {historyDropdown === 'sensor' && METRIC_DEFS.map((m) => (
+              <TouchableOpacity
+                key={m.id}
+                style={[styles.menuOption, historySensor === m.id && styles.menuOptionActive]}
+                onPress={() => { setHistorySensor(m.id); setHistoryDropdown(null); }}
+              >
+                <Text style={[styles.menuOptionText, historySensor === m.id && styles.menuOptionTextActive]}>
+                  {SENSOR_FULL_LABEL[m.id]}
+                </Text>
+                {historySensor === m.id && <Ionicons name="checkmark" size={16} color={GREEN} />}
               </TouchableOpacity>
             ))}
           </View>
@@ -886,18 +1400,6 @@ const styles = StyleSheet.create({
   penLine: { flex: 1, height: 1, backgroundColor: BORDER },
   cardGrid: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
 
-  futureBox: {
-    backgroundColor: WHITE, borderRadius: 14,
-    padding: 16, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed',
-    marginTop: 4,
-  },
-  futureTitle: {
-    fontSize: 11, fontWeight: '700', color: '#8E8EA0',
-    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10,
-  },
-  futureItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  futureItemText: { fontSize: 14, color: '#8E8EA0', fontWeight: '500' },
-
   overlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32,
@@ -922,4 +1424,127 @@ const styles = StyleSheet.create({
   menuOptionActive: { backgroundColor: '#EAF4EE' },
   menuOptionText: { fontSize: 16, color: '#1A2B22', fontWeight: '500' },
   menuOptionTextActive: { color: GREEN, fontWeight: '700' },
+});
+
+// ─── Environmental Trends Styles ──────────────────────────────────────────────
+// Declared after GREEN/BG/WHITE/BORDER above so they're safe to reference here.
+
+const trend = StyleSheet.create({
+  card: {
+    backgroundColor: WHITE,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 },
+      android: { elevation: 2 },
+    }),
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A2B22',
+    marginBottom: 12,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterChipWide: {
+    flexGrow: 1,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: GREEN,
+  },
+  chartCard: {
+    backgroundColor: BG,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 6,
+  },
+  chartHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1A2B22',
+  },
+  chartSubtitle: {
+    fontSize: 12,
+    color: '#8E8EA0',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  latestValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  stateBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 6,
+  },
+  stateText: {
+    fontSize: 12,
+    color: '#8E8EA0',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  plotArea: {
+    height: 140,
+    width: '100%',
+    position: 'relative',
+  },
+  gridline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#E3E6E4',
+  },
+  chartLine: {
+    position: 'absolute',
+    height: 2,
+    borderRadius: 1,
+  },
+  chartDot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  axisRow: {
+    height: 16,
+    position: 'relative',
+    marginTop: 6,
+  },
+  axisLabel: {
+    position: 'absolute',
+    fontSize: 10,
+    color: '#8E8EA0',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
 });

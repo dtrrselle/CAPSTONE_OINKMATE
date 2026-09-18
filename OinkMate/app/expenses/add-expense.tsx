@@ -55,7 +55,7 @@ const CATEGORIES = [
 // NOTE: dapat naka-open at naka-RUN yung ngrok tunnel mo (ngrok http <port>)
 // bago mo i-test 'to, kasi kailangan live yung URL na 'to para may sumagot.
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
 
 // Convert a JS Date -> "YYYY-MM-DD" for the `expense_date` column (DATE type).
 const toApiDate = (d: Date) => {
@@ -307,7 +307,7 @@ export default function AddExpense() {
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color="#555" />
+          <Ionicons name="chevron-back" size={18} color="#2F5D50" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Add Expense</Text>
         <View style={s.headerSpacer} />
@@ -546,9 +546,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
+    fontFamily: 'Arial',
     flex: 1,
     textAlign:        'center',
-    fontSize:         17,
+    fontSize: 19,
     fontWeight:       '700',
     color:            C.text,
     letterSpacing:    0.2,
@@ -575,7 +576,8 @@ const s = StyleSheet.create({
   divider:            { height: 1, backgroundColor: C.border },
 
   label: {
-    fontSize:         12,
+    fontFamily: 'Arial',
+    fontSize: 15,
     fontWeight:       '600',
     color:            C.textSub,
     textTransform:    'uppercase',
@@ -584,7 +586,8 @@ const s = StyleSheet.create({
   },
   labelRow:           { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   optional: {
-    fontSize:         11,
+    fontFamily: 'Arial',
+    fontSize: 14,
     color:            C.pink,
     marginLeft:       8,
     fontWeight:       '500',
@@ -605,9 +608,9 @@ const s = StyleSheet.create({
     borderWidth:      1,
     borderColor:      C.border,
   },
-  dateIcon:           { fontSize: 16, marginRight: 10 },
-  dateValue:          { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' },
-  dateChevron:        { fontSize: 18, color: C.textSub, marginRight: -2 },
+  dateIcon:           { fontFamily: 'Arial', fontSize: 19, marginRight: 10 },
+  dateValue:          { fontFamily: 'Arial', flex: 1, fontSize: 18, color: C.text, fontWeight: '500' },
+  dateChevron:        { fontFamily: 'Arial', fontSize: 20, color: C.textSub, marginRight: -2 },
 
   // Dropdown
   dropdownTrigger: {
@@ -620,8 +623,8 @@ const s = StyleSheet.create({
     borderWidth:      1,
     borderColor:      C.border,
   },
-  dropdownValue:      { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' },
-  dropdownArrow:      { fontSize: 14, color: C.textSub },
+  dropdownValue:      { fontFamily: 'Arial', flex: 1, fontSize: 18, color: C.text, fontWeight: '500' },
+  dropdownArrow:      { fontFamily: 'Arial', fontSize: 17, color: C.textSub },
 
   // Amount
   amountRow:          { flexDirection: 'row', alignItems: 'center' },
@@ -634,8 +637,9 @@ const s = StyleSheet.create({
     alignItems:       'center',
     justifyContent:   'center',
   },
-  pesoSign:           { fontSize: 18, color: '#fff', fontWeight: '700' },
+  pesoSign:           { fontFamily: 'Arial', fontSize: 20, color: '#fff', fontWeight: '700' },
   amountInput: {
+    fontFamily: 'Arial',
     flex:             1,
     height:           48,
     backgroundColor:  C.bg,
@@ -645,20 +649,21 @@ const s = StyleSheet.create({
     borderTopRightRadius: 10,
     borderBottomRightRadius: 10,
     paddingHorizontal: 14,
-    fontSize:         15,
+    fontSize: 18,
     color:            C.text,
     fontWeight:       '500',
   },
 
   // Textarea
   textarea: {
+    fontFamily: 'Arial',
     backgroundColor:  C.bg,
     borderRadius:     10,
     borderWidth:      1,
     borderColor:      C.border,
     paddingHorizontal: 14,
     paddingVertical:  12,
-    fontSize:         15,
+    fontSize: 18,
     color:            C.text,
     minHeight:        100,
     lineHeight:       22,
@@ -679,8 +684,8 @@ const s = StyleSheet.create({
     elevation:        2,
   },
   summaryHeader:      { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  summaryDot:         { fontSize: 10, color: C.green, marginRight: 6 },
-  summaryTitle:       { fontSize: 13, fontWeight: '700', color: C.green, letterSpacing: 0.4 },
+  summaryDot:         { fontFamily: 'Arial', fontSize: 12, color: C.green, marginRight: 6 },
+  summaryTitle:       { fontFamily: 'Arial', fontSize: 16, fontWeight: '700', color: C.green, letterSpacing: 0.4 },
   summaryDivider:     { height: 1, backgroundColor: C.greenMuted, marginBottom: 12 },
   summaryRow: {
     flexDirection:    'row',
@@ -688,9 +693,9 @@ const s = StyleSheet.create({
     alignItems:       'center',
     marginBottom:     8,
   },
-  summaryKey:         { fontSize: 13, color: C.textSub, fontWeight: '500' },
-  summaryVal:         { fontSize: 13, color: C.text, fontWeight: '600' },
-  summaryAmount:      { color: C.green, fontSize: 15, fontWeight: '700' },
+  summaryKey:         { fontFamily: 'Arial', fontSize: 16, color: C.textSub, fontWeight: '500' },
+  summaryVal:         { fontFamily: 'Arial', fontSize: 16, color: C.text, fontWeight: '600' },
+  summaryAmount:      { fontFamily: 'Arial', color: C.green, fontSize: 18, fontWeight: '700' },
 
   // Save button
   saveBtn: {
@@ -705,8 +710,9 @@ const s = StyleSheet.create({
     elevation:        5,
   },
   saveBtnTxt: {
+    fontFamily: 'Arial',
     color:            '#fff',
-    fontSize:         16,
+    fontSize: 19,
     fontWeight:       '700',
     letterSpacing:    0.4,
   },
@@ -734,14 +740,14 @@ const s = StyleSheet.create({
     backgroundColor: C.greenMuted,
     alignItems: 'center', justifyContent: 'center',
   },
-  calNavTxt:          { fontSize: 22, color: C.green, fontWeight: '600', marginTop: -2 },
-  calTitle:           { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: C.text },
+  calNavTxt:          { fontFamily: 'Arial', fontSize: 23, color: C.green, fontWeight: '600', marginTop: -2 },
+  calTitle:           { fontFamily: 'Arial', flex: 1, textAlign: 'center', fontSize: 19, fontWeight: '700', color: C.text },
   calRow:             { flexDirection: 'row', marginBottom: 8 },
-  calDayLabel:        { flex: 1, textAlign: 'center', fontSize: 11, color: C.textSub, fontWeight: '600' },
+  calDayLabel:        { fontFamily: 'Arial', flex: 1, textAlign: 'center', fontSize: 14, color: C.textSub, fontWeight: '600' },
   calGrid:            { flexDirection: 'row', flexWrap: 'wrap' },
   calCell:            { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   calCellSel:         { backgroundColor: C.green, borderRadius: 999 },
-  calCellTxt:         { fontSize: 14, color: C.text },
+  calCellTxt:         { fontFamily: 'Arial', fontSize: 17, color: C.text },
   calCellTxtSel:      { color: '#fff', fontWeight: '700' },
   calCellTxtToday:    { color: C.green, fontWeight: '700' },
   calActions:         { flexDirection: 'row', marginTop: 20, gap: 12 },
@@ -750,13 +756,13 @@ const s = StyleSheet.create({
     borderRadius: 12, borderWidth: 1, borderColor: C.border,
     alignItems: 'center',
   },
-  calBtnSecondaryTxt: { fontSize: 15, color: C.textSub, fontWeight: '600' },
+  calBtnSecondaryTxt: { fontFamily: 'Arial', fontSize: 18, color: C.textSub, fontWeight: '600' },
   calBtnPrimary: {
     flex: 1, paddingVertical: 13,
     borderRadius: 12, backgroundColor: C.green,
     alignItems: 'center',
   },
-  calBtnPrimaryTxt:   { fontSize: 15, color: '#fff', fontWeight: '700' },
+  calBtnPrimaryTxt:   { fontFamily: 'Arial', fontSize: 18, color: '#fff', fontWeight: '700' },
 
   // Dropdown sheet
   dropdownSheet: {
@@ -770,7 +776,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
   dropdownSheetTitle: {
-    fontSize:         16, fontWeight: '700', color: C.text,
+    fontFamily: 'Arial',
+    fontSize: 19, fontWeight: '700', color: C.text,
     marginBottom:     16, textAlign: 'center',
   },
   dropdownItem: {
@@ -779,9 +786,9 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: C.border,
   },
   dropdownItemActive: { backgroundColor: C.greenMuted, borderRadius: 10, paddingHorizontal: 12, marginHorizontal: -12 },
-  dropdownItemTxt:    { flex: 1, fontSize: 15, color: C.text, fontWeight: '500' },
+  dropdownItemTxt:    { fontFamily: 'Arial', flex: 1, fontSize: 18, color: C.text, fontWeight: '500' },
   dropdownItemTxtActive: { color: C.green, fontWeight: '700' },
-  dropdownCheck:      { fontSize: 16, color: C.green, fontWeight: '700' },
+  dropdownCheck:      { fontFamily: 'Arial', fontSize: 19, color: C.green, fontWeight: '700' },
 
   // Confirmation modal
   confirmOverlay: {
@@ -815,14 +822,16 @@ const s = StyleSheet.create({
     marginBottom:     16,
   },
   confirmTitle: {
-    fontSize:         18,
+    fontFamily: 'Arial',
+    fontSize: 20,
     fontWeight:       '700',
     color:            C.text,
     marginBottom:     10,
     letterSpacing:    0.2,
   },
   confirmMsg: {
-    fontSize:         14,
+    fontFamily: 'Arial',
+    fontSize: 17,
     color:            C.textSub,
     textAlign:        'center',
     lineHeight:       21,
@@ -844,7 +853,8 @@ const s = StyleSheet.create({
     justifyContent:   'center',
   },
   confirmBtnCancelTxt: {
-    fontSize:         15,
+    fontFamily: 'Arial',
+    fontSize: 18,
     fontWeight:       '600',
     color:            C.textSub,
   },
@@ -863,7 +873,8 @@ const s = StyleSheet.create({
     elevation:        4,
   },
   confirmBtnSaveTxt: {
-    fontSize:         15,
+    fontFamily: 'Arial',
+    fontSize: 18,
     fontWeight:       '700',
     color:            '#fff',
   },
@@ -885,7 +896,8 @@ const s = StyleSheet.create({
     elevation:        4,
   },
   doneBtnTxt: {
-    fontSize:         16,
+    fontFamily: 'Arial',
+    fontSize: 19,
     fontWeight:       '700',
     color:            '#fff',
     letterSpacing:    0.3,

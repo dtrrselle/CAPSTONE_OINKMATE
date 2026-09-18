@@ -44,10 +44,16 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </Text>
             {/* Date & Time Chip */}
             <View style={styles.dateTimeChip}>
-              <Ionicons name="calendar-outline" size={11} color="#6B8A82" />
-              <Text style={styles.dateText}>{currentDate}</Text>
+              <Ionicons name="calendar-outline" size={12} color="#2F5D50" />
+              <Text
+                style={styles.dateText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {currentDate}
+              </Text>
               <View style={styles.timeDivider} />
-              <Ionicons name="time-outline" size={11} color="#2F5D50" />
+              <Ionicons name="time-outline" size={12} color="#2F5D50" />
               <Text style={styles.timeText}>{currentTime}</Text>
             </View>
           </View>
@@ -64,7 +70,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           accessibilityLabel="Notifications"
           accessibilityRole="button"
         >
-          <Ionicons name="notifications" size={22} color="#2F5D50" />
+          <Ionicons name="notifications" size={20} color="#2F5D50" />
           {unreadCount > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -113,19 +119,21 @@ const styles = StyleSheet.create({
 
   greetingBlock: {
     flex: 1,
-    gap: 5,
+    gap: 6,
   },
 
   welcomeText: {
-    fontSize: 15,
+    fontFamily: 'Arial',
+    fontSize: 17,
     fontWeight: '500',
-    color: '#6B8A82',
+    color: '#5F6D69',
     letterSpacing: 0.1,
   },
 
   farmerName: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Arial',
+    fontSize: 19,
+    fontWeight: '700',
     color: '#1A2D27',
   },
 
@@ -141,33 +149,38 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: '#E2EDEA',
+    maxWidth: '100%',
   },
   dateText: {
-    fontSize: 10,
-    color: '#6B8A82',
+    fontFamily: 'Arial',
+    fontSize: 12,
+    color: '#5F6D69',
     fontWeight: '500',
+    flexShrink: 1,
   },
   timeDivider: {
     width: 1,
-    height: 9,
+    height: 10,
     backgroundColor: '#C8D8D4',
     marginHorizontal: 2,
   },
   timeText: {
-    fontSize: 10,
+    fontFamily: 'Arial',
+    fontSize: 12,
     color: '#2F5D50',
     fontWeight: '700',
     letterSpacing: 0.3,
+    flexShrink: 0,
   },
 
   /* Bell */
   rightSection: {
-    paddingLeft: 12,
+    paddingLeft: 10,
   },
   notifButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 13,
     backgroundColor: '#F4F8F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -181,11 +194,11 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
     minWidth: 17,
     height: 17,
-    borderRadius: 9,
+    borderRadius: 8.5,
     backgroundColor: '#E53935',
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,10 +207,11 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   badgeText: {
-    fontSize: 9,
-    fontWeight: '800',
+    fontFamily: 'Arial',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#FFFFFF',
-    lineHeight: 12,
+    lineHeight: 13,
   },
 });
 

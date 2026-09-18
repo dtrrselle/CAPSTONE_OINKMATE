@@ -24,6 +24,11 @@ export default function Reports() {
           onFinancialAnalysisPress={() =>
             router.push('/reports/roi-analysis')
           }
+
+              onMarketRecommendationPress={() =>
+          router.push('/market/market-home')
+        }
+
           onLearningHubPress={() =>
             router.push('/learning/learning-hub')
           }

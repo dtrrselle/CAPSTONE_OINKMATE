@@ -5,10 +5,12 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface FarmStat {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
+  mcIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  emoji?: string;
   title: string;
   value: number | string;
   subtitle: string;
@@ -22,6 +24,8 @@ interface StatCardProps extends FarmStat {
 
 const StatCard: React.FC<StatCardProps> = ({
   icon,
+  mcIcon,
+  emoji,
   title,
   value,
   subtitle,
@@ -31,7 +35,13 @@ const StatCard: React.FC<StatCardProps> = ({
 }) => (
   <View style={[styles.card, { width: cardWidth, borderColor: accentColor + '30' }]}>
     <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
-      <Ionicons name={icon} size={20} color={accentColor} />
+      {mcIcon ? (
+        <MaterialCommunityIcons name={mcIcon} size={20} color={accentColor} />
+      ) : emoji ? (
+        <Text style={styles.iconEmoji}>{emoji}</Text>
+      ) : (
+        icon && <Ionicons name={icon} size={20} color={accentColor} />
+      )}
     </View>
     <Text style={[styles.value, { color: accentColor }]}>{value}</Text>
     <Text style={styles.title}>{title}</Text>
@@ -68,12 +78,12 @@ const FarmOverview: React.FC<FarmOverviewProps> = ({
       iconBg: '#EAF7EF',
     },
     {
-      icon: 'paw',
+      mcIcon: 'pig',
       title: 'Total Pigs',
       value: totalPigs,
       subtitle: 'All Pens',
-      accentColor: '#C2547A',
-      iconBg: '#FDEDF3',
+      accentColor: '#2F5D50',
+      iconBg: '#EAF7F1',
     },
     {
       icon: 'checkmark-circle',
@@ -105,9 +115,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4F6F5',
   },
   sectionLabel: {
-    fontSize: 11,
+    fontFamily: 'Arial',
+    fontSize: 12,
     fontWeight: '700',
-    color: '#9AACAB',
+    color: '#8B9693',
     letterSpacing: 0.9,
     textTransform: 'uppercase',
     marginBottom: 12,
@@ -120,7 +131,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     paddingVertical: 16,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
@@ -138,23 +149,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
+  iconEmoji: {
+    fontSize: 20,
+    lineHeight: 22,
+  },
   value: {
-    fontSize: 26,
+    fontFamily: 'Arial',
+    fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.8,
-    lineHeight: 30,
+    lineHeight: 32,
   },
   title: {
-    fontSize: 12,
+    fontFamily: 'Arial',
+    fontSize: 13,
     fontWeight: '700',
     color: '#1A2D27',
     marginTop: 4,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 10,
+    fontFamily: 'Arial',
+    fontSize: 11,
     fontWeight: '400',
-    color: '#A0AAB3',
+    color: '#9AA8A4',
     marginTop: 2,
     marginBottom: 12,
     textAlign: 'center',

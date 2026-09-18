@@ -12,7 +12,6 @@ export interface FeedingScheduleEntry {
   status?: ScheduleStatus;
   feedAmountPerPig?: number | string;
   totalFeedRequired?: number | string;
-  feedPerContainer?: number | string;
   onEditPress?: () => void;
   onDeletePress?: () => void;
 }
@@ -41,7 +40,7 @@ const FeedingScheduleCard: React.FC<FeedingScheduleCardProps> = ({
       <View style={styles.topRow}>
         <View style={styles.titleBlock}>
           <View style={styles.iconWrap}>
-            <Ionicons name="restaurant-outline" size={17} color="#C2547A" />
+            <Ionicons name="restaurant-outline" size={19} color="#2F5D50" />
           </View>
           <Text style={styles.title}>{target}</Text>
         </View>
@@ -58,7 +57,7 @@ const FeedingScheduleCard: React.FC<FeedingScheduleCardProps> = ({
             <View style={styles.entryBlock}>
               <View style={styles.entryTopRow}>
                 <View style={styles.detailRow}>
-                  <Ionicons name="time-outline" size={14} color="#A0B5AD" />
+                  <Ionicons name="time-outline" size={16} color="#3E7D68" />
                   <Text style={styles.detailText}>{entry.scheduleTime ?? '6:00 AM'}</Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -72,38 +71,32 @@ const FeedingScheduleCard: React.FC<FeedingScheduleCardProps> = ({
               <View style={styles.detailsBlock}>
                 {entry.repeatLabel !== undefined && (
                   <View style={styles.detailRow}>
-                    <Ionicons name="refresh-outline" size={14} color="#A0B5AD" />
+                    <Ionicons name="refresh-outline" size={16} color="#3E7D68" />
                     <Text style={styles.detailText}>{entry.repeatLabel}</Text>
                   </View>
                 )}
                 {entry.feedAmountPerPig !== undefined && (
                   <View style={styles.detailRow}>
-                    <Ionicons name="nutrition-outline" size={14} color="#A0B5AD" />
+                    <Ionicons name="nutrition-outline" size={16} color="#3E7D68" />
                     <Text style={styles.detailText}>Feed Amount Per Pig: {entry.feedAmountPerPig} kg</Text>
                   </View>
                 )}
                 {entry.totalFeedRequired !== undefined && (
                   <View style={styles.detailRow}>
-                    <Ionicons name="scale-outline" size={14} color="#A0B5AD" />
+                    <Ionicons name="scale-outline" size={16} color="#3E7D68" />
                     <Text style={styles.detailText}>Total Feed Required: {entry.totalFeedRequired} kg</Text>
-                  </View>
-                )}
-                {entry.feedPerContainer !== undefined && (
-                  <View style={styles.detailRow}>
-                    <Ionicons name="cube-outline" size={14} color="#A0B5AD" />
-                    <Text style={styles.detailText}>Feed Per Container: {entry.feedPerContainer} kg</Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.footerRow}>
                 <TouchableOpacity style={styles.editButton} onPress={entry.onEditPress} activeOpacity={0.8}>
-                  <Ionicons name="create-outline" size={14} color="#2F5D50" />
+                  <Ionicons name="create-outline" size={16} color="#2F5D50" />
                   <Text style={styles.editButtonText}>Edit</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.deleteButton} onPress={entry.onDeletePress} activeOpacity={0.8}>
-                  <Ionicons name="trash-outline" size={14} color="#D96C8D" />
+                  <Ionicons name="trash-outline" size={16} color="#E23744" />
                   <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -153,28 +146,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: 20,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
   },
   statusDot: {
-    width: 5,
-    height: 5,
+    width: 6,
+    height: 6,
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Divider between grouped schedule entries within the same Pen card */
@@ -202,9 +195,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   detailText: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '500',
   },
 
@@ -219,36 +212,36 @@ const styles = StyleSheet.create({
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: '#F4F8F6',
     borderRadius: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#DCEAE5',
   },
   editButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#2F5D50',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FCF0F3',
+    gap: 6,
+    backgroundColor: '#FDECEC',
     borderRadius: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#F6DCE3',
+    borderColor: '#F8D3D3',
   },
   deleteButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#D96C8D',
-    fontFamily: 'Inter',
+    color: '#E23744',
+    fontFamily: 'Arial',
   },
 });
 

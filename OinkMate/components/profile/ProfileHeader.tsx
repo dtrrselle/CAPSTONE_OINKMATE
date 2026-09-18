@@ -53,14 +53,14 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     color: '#1A2D27',
     letterSpacing: -0.4,
     fontFamily: 'Inter',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
     color: '#8A9994',
     fontFamily: 'Inter',

@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, View, ActivityIndicator, Alert, Modal, TouchableOpacity, Text } from 'react-native';
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  TouchableOpacity,
+  Text,
+} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +64,7 @@ function DeleteSuccessModal({
           <View style={modalStyles.iconCircle}>
             <Ionicons name="checkmark-circle" size={40} color="#2F5D50" />
           </View>
+
           <Text style={modalStyles.title}>{title}</Text>
           <Text style={modalStyles.message}>{message}</Text>
 
@@ -88,29 +99,31 @@ type SanitationSchedule = {
   pen_id: number;
   pen_name: string;
   schedule_time: string;
-  duration_minutes: number | null;
+  duration_seconds: number | null;
   trigger_temperature: number | null;
   status: string;
 };
 
 // Pig Pen shape needed by ManualOverrideControls to let the farmer pick
 // which device (Raspberry Pi) a manual override command should target.
-// Loaded here from the existing Pig Pen endpoint and passed down as
-// props — ManualOverrideControls itself never fetches this.
+// Loaded here from the existing Pig Pen endpoint and passed down
+// as props — ManualOverrideControls itself never fetches this.
 type PigPen = {
   pen_id: number;
   pen_name: string;
   device_code: string;
+  pig_count: number | null;
 };
 
 // NOTE: dapat naka-open at naka-RUN yung ngrok tunnel mo (ngrok http <port>)
 // bago mo i-test 'to, kasi kailangan live yung URL na 'to para may sumagot.
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
 
 // Convert "08:00:00" (24-hour, from TIME column) -> "8:00 AM"
 function formatTo12Hour(time24h: string): string {
   if (!time24h) return '';
+
   const [hoursStr, minutesStr] = time24h.split(':');
   let hours = parseInt(hoursStr, 10);
   const minutes = minutesStr ?? '00';
@@ -122,13 +135,19 @@ function formatTo12Hour(time24h: string): string {
   return `${hours}:${minutes} ${modifier}`;
 }
 
-// Map DB status ('active' / 'inactive') to the ScheduleStatus type FeedingScheduleCard expects.
-function mapFeedingStatus(status: string): 'Upcoming' | 'Completed' | 'Missed' | 'Active' {
+// Map DB status ('active' / 'inactive') to the ScheduleStatus type
+// FeedingScheduleCard expects.
+function mapFeedingStatus(
+  status: string
+): 'Upcoming' | 'Completed' | 'Missed' | 'Active' {
   return status?.toLowerCase() === 'active' ? 'Active' : 'Upcoming';
 }
 
-// Map DB status ('active' / 'inactive') to the ScheduleStatus type SanitationScheduleCard expects.
-function mapSanitationStatus(status: string): 'Upcoming' | 'Completed' | 'Missed' | 'Active' {
+// Map DB status ('active' / 'inactive') to the ScheduleStatus type
+// SanitationScheduleCard expects.
+function mapSanitationStatus(
+  status: string
+): 'Upcoming' | 'Completed' | 'Missed' | 'Active' {
   return status?.toLowerCase() === 'active' ? 'Active' : 'Upcoming';
 }
 
@@ -140,8 +159,9 @@ export default function Schedule() {
     'feeding'
   );
 
-  // If we arrived here from Quick Access with a `tab` param (e.g. from the
-  // dashboard's Feeding or Sanitation shortcuts), auto-select that tab.
+  // If we arrived here from Quick Access with a `tab` param
+  // (e.g. from the dashboard's Feeding or Sanitation shortcuts),
+  // auto-select that tab.
   // This only sets the initial tab — manual tab switching afterwards is untouched.
   useEffect(() => {
     if (tab === 'feeding' || tab === 'sanitation') {
@@ -151,31 +171,49 @@ export default function Schedule() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Tracks which schedule (and which type: feeding or sanitation) is targeted
-  // by the current delete action.
-  const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
-  const [pendingDeleteType, setPendingDeleteType] = useState<'feeding' | 'sanitation' | null>(null);
+  // Tracks which schedule (and which type: feeding or sanitation)
+  // is targeted by the current delete action.
+  const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
+    null
+  );
+
+  const [pendingDeleteType, setPendingDeleteType] = useState<
+    'feeding' | 'sanitation' | null
+  >(null);
+
   const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
   const [showDeleteLoadingModal, setShowDeleteLoadingModal] = useState(false);
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
+
   // Text shown in the loading/success modals — set per delete type before opening.
-  const [deleteLoadingMessage, setDeleteLoadingMessage] = useState('Deleting Schedule...');
-  const [deleteSuccessTitle, setDeleteSuccessTitle] = useState('Schedule Deleted');
+  const [deleteLoadingMessage, setDeleteLoadingMessage] = useState(
+    'Deleting Schedule...'
+  );
+
+  const [deleteSuccessTitle, setDeleteSuccessTitle] = useState(
+    'Schedule Deleted'
+  );
+
   const [deleteSuccessMessage, setDeleteSuccessMessage] = useState(
     'Schedule has been deleted successfully.'
   );
 
   // Feeding Schedules loaded from the database for the logged-in farmer.
-  const [feedingSchedules, setFeedingSchedules] = useState<FeedingSchedule[]>([]);
+  const [feedingSchedules, setFeedingSchedules] = useState<
+    FeedingSchedule[]
+  >([]);
+
   const [loadingFeeding, setLoadingFeeding] = useState(false);
 
   // Load the logged-in farmer's Feeding Schedules.
   useEffect(() => {
     const loadFeedingSchedules = async () => {
       setLoadingFeeding(true);
+
       try {
         // The logged-in user session is stored in AsyncStorage on login.
         const storedUser = await AsyncStorage.getItem('user');
+
         if (!storedUser) {
           console.log('No logged-in user found in AsyncStorage');
           setLoadingFeeding(false);
@@ -183,7 +221,8 @@ export default function Schedule() {
         }
 
         const user = JSON.parse(storedUser);
-        const farmer_id = user?.farmer_id ?? user?.id ?? user?.user_id;
+        const farmer_id =
+          user?.farmer_id ?? user?.id ?? user?.user_id;
 
         if (!farmer_id) {
           console.log('No farmer_id found on stored user session');
@@ -194,12 +233,16 @@ export default function Schedule() {
         const response = await fetch(
           `${API_BASE_URL}/api/schedules/get_feeding_schedules.php?farmer_id=${farmer_id}`
         );
+
         const data = await response.json();
 
         if (data.success && Array.isArray(data.schedules)) {
           setFeedingSchedules(data.schedules);
         } else {
-          console.log('Failed to load feeding schedules:', data.message);
+          console.log(
+            'Failed to load feeding schedules:',
+            data.message
+          );
         }
       } catch (error) {
         console.log('Load feeding schedules error:', error);
@@ -212,16 +255,21 @@ export default function Schedule() {
   }, []);
 
   // Sanitation Schedules loaded from the database for the logged-in farmer.
-  const [sanitationSchedules, setSanitationSchedules] = useState<SanitationSchedule[]>([]);
+  const [sanitationSchedules, setSanitationSchedules] = useState<
+    SanitationSchedule[]
+  >([]);
+
   const [loadingSanitation, setLoadingSanitation] = useState(false);
 
   // Load the logged-in farmer's Sanitation Schedules.
   useEffect(() => {
     const loadSanitationSchedules = async () => {
       setLoadingSanitation(true);
+
       try {
         // The logged-in user session is stored in AsyncStorage on login.
         const storedUser = await AsyncStorage.getItem('user');
+
         if (!storedUser) {
           console.log('No logged-in user found in AsyncStorage');
           setLoadingSanitation(false);
@@ -229,7 +277,8 @@ export default function Schedule() {
         }
 
         const user = JSON.parse(storedUser);
-        const farmer_id = user?.farmer_id ?? user?.id ?? user?.user_id;
+        const farmer_id =
+          user?.farmer_id ?? user?.id ?? user?.user_id;
 
         if (!farmer_id) {
           console.log('No farmer_id found on stored user session');
@@ -240,12 +289,16 @@ export default function Schedule() {
         const response = await fetch(
           `${API_BASE_URL}/api/schedules/get_sanitation_schedules.php?farmer_id=${farmer_id}`
         );
+
         const data = await response.json();
 
         if (data.success && Array.isArray(data.schedules)) {
           setSanitationSchedules(data.schedules);
         } else {
-          console.log('Failed to load sanitation schedules:', data.message);
+          console.log(
+            'Failed to load sanitation schedules:',
+            data.message
+          );
         }
       } catch (error) {
         console.log('Load sanitation schedules error:', error);
@@ -271,8 +324,10 @@ export default function Schedule() {
   useEffect(() => {
     const loadPigPens = async () => {
       setLoadingPigPens(true);
+
       try {
         const storedUser = await AsyncStorage.getItem('user');
+
         if (!storedUser) {
           console.log('No logged-in user found in AsyncStorage');
           setLoadingPigPens(false);
@@ -280,7 +335,8 @@ export default function Schedule() {
         }
 
         const user = JSON.parse(storedUser);
-        const farmer_id = user?.farmer_id ?? user?.id ?? user?.user_id;
+        const farmer_id =
+          user?.farmer_id ?? user?.id ?? user?.user_id;
 
         if (!farmer_id) {
           console.log('No farmer_id found on stored user session');
@@ -292,10 +348,13 @@ export default function Schedule() {
           `${API_BASE_URL}/api/iot/manual/get_pig_pens.php`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+            },
             body: JSON.stringify({ farmer_id }),
           }
         );
+
         const data = await response.json();
 
         if (data.success && Array.isArray(data.pig_pens)) {
@@ -304,10 +363,14 @@ export default function Schedule() {
               pen_id: pen.pen_id,
               pen_name: pen.pen_name,
               device_code: pen.device_code,
+              pig_count: pen.pig_count ?? null,
             }))
           );
         } else {
-          console.log('Failed to load pig pens:', data.message);
+          console.log(
+            'Failed to load pig pens:',
+            data.message
+          );
         }
       } catch (error) {
         console.log('Load pig pens error:', error);
@@ -322,14 +385,25 @@ export default function Schedule() {
   // Group Feeding Schedules by Pig Pen so each pen renders as a single card
   // containing all of its schedule entries.
   const feedingByPen = useMemo(() => {
-    const groups: { pen_id: number; pen_name: string; schedules: FeedingSchedule[] }[] = [];
+    const groups: {
+      pen_id: number;
+      pen_name: string;
+      schedules: FeedingSchedule[];
+    }[] = [];
+
     const indexByPenId = new Map<number, number>();
 
     feedingSchedules.forEach((item) => {
       const existingIndex = indexByPenId.get(item.pen_id);
+
       if (existingIndex === undefined) {
         indexByPenId.set(item.pen_id, groups.length);
-        groups.push({ pen_id: item.pen_id, pen_name: item.pen_name, schedules: [item] });
+
+        groups.push({
+          pen_id: item.pen_id,
+          pen_name: item.pen_name,
+          schedules: [item],
+        });
       } else {
         groups[existingIndex].schedules.push(item);
       }
@@ -341,14 +415,25 @@ export default function Schedule() {
   // Group Sanitation Schedules by Pig Pen so each pen renders as a single card
   // containing all of its schedule entries.
   const sanitationByPen = useMemo(() => {
-    const groups: { pen_id: number; pen_name: string; schedules: SanitationSchedule[] }[] = [];
+    const groups: {
+      pen_id: number;
+      pen_name: string;
+      schedules: SanitationSchedule[];
+    }[] = [];
+
     const indexByPenId = new Map<number, number>();
 
     sanitationSchedules.forEach((item) => {
       const existingIndex = indexByPenId.get(item.pen_id);
+
       if (existingIndex === undefined) {
         indexByPenId.set(item.pen_id, groups.length);
-        groups.push({ pen_id: item.pen_id, pen_name: item.pen_name, schedules: [item] });
+
+        groups.push({
+          pen_id: item.pen_id,
+          pen_name: item.pen_name,
+          schedules: [item],
+        });
       } else {
         groups[existingIndex].schedules.push(item);
       }
@@ -357,22 +442,37 @@ export default function Schedule() {
     return groups;
   }, [sanitationSchedules]);
 
-  // Deletes the currently selected schedule (Feeding or Sanitation, based on
-  // pendingDeleteType). Called when the user confirms deletion in DeleteScheduleModal.
+  // Deletes the currently selected schedule (Feeding or Sanitation,
+  // based on pendingDeleteType).
+  // Called when the user confirms deletion in DeleteScheduleModal.
   const handleDeleteSchedule = async () => {
-    if (selectedScheduleId === null || pendingDeleteType === null || isDeletingSchedule) {
+    if (
+      selectedScheduleId === null ||
+      pendingDeleteType === null ||
+      isDeletingSchedule
+    ) {
       return;
     }
 
     const isFeeding = pendingDeleteType === 'feeding';
-    const endpoint = isFeeding ? 'delete_feeding_schedule.php' : 'delete_sanitation_schedule.php';
-    const idField = isFeeding ? 'schedule_id' : 'sanitation_id';
+
+    const endpoint = isFeeding
+      ? 'delete_feeding_schedule.php'
+      : 'delete_sanitation_schedule.php';
+
+    const idField = isFeeding
+      ? 'schedule_id'
+      : 'sanitation_id';
 
     setIsDeletingSchedule(true);
     setShowDeleteModal(false);
+
     setDeleteLoadingMessage(
-      isFeeding ? 'Deleting Feeding Schedule...' : 'Deleting Sanitation Schedule...'
+      isFeeding
+        ? 'Deleting Feeding Schedule...'
+        : 'Deleting Sanitation Schedule...'
     );
+
     setShowDeleteLoadingModal(true);
 
     try {
@@ -380,10 +480,15 @@ export default function Schedule() {
         `${API_BASE_URL}/api/schedules/${endpoint}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [idField]: selectedScheduleId }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            [idField]: selectedScheduleId,
+          }),
         }
       );
+
       const data = await response.json();
 
       setShowDeleteLoadingModal(false);
@@ -391,27 +496,44 @@ export default function Schedule() {
       if (data.success) {
         if (isFeeding) {
           setFeedingSchedules((prev) =>
-            prev.filter((item) => item.schedule_id !== selectedScheduleId)
+            prev.filter(
+              (item) =>
+                item.schedule_id !== selectedScheduleId
+            )
           );
         } else {
           setSanitationSchedules((prev) =>
-            prev.filter((item) => item.sanitation_id !== selectedScheduleId)
+            prev.filter(
+              (item) =>
+                item.sanitation_id !== selectedScheduleId
+            )
           );
         }
+
         setDeleteSuccessTitle('Schedule Deleted');
+
         setDeleteSuccessMessage(
           isFeeding
             ? 'Feeding Schedule has been deleted successfully.'
             : 'Sanitation Schedule has been deleted successfully.'
         );
+
         setShowDeleteSuccessModal(true);
       } else {
-        Alert.alert('Delete Failed', data.message ?? 'Schedule not found.');
+        Alert.alert(
+          'Delete Failed',
+          data.message ?? 'Schedule not found.'
+        );
       }
     } catch (error) {
       console.log('Delete schedule error:', error);
+
       setShowDeleteLoadingModal(false);
-      Alert.alert('Delete Failed', 'Something went wrong. Please try again.');
+
+      Alert.alert(
+        'Delete Failed',
+        'Something went wrong. Please try again.'
+      );
     } finally {
       setIsDeletingSchedule(false);
       setSelectedScheduleId(null);
@@ -431,7 +553,10 @@ export default function Schedule() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <ManualOverrideControls pigPens={pigPens} loadingPigPens={loadingPigPens} />
+        <ManualOverrideControls
+          pigPens={pigPens}
+          loadingPigPens={loadingPigPens}
+        />
 
         <View style={styles.tabsSection}>
           <ScheduleTypeTabs
@@ -443,7 +568,10 @@ export default function Schedule() {
         {selectedTab === 'feeding' ? (
           loadingFeeding ? (
             <View style={styles.loadingSection}>
-              <ActivityIndicator size="large" color="#2F5D50" />
+              <ActivityIndicator
+                size="large"
+                color="#2F5D50"
+              />
             </View>
           ) : feedingSchedules.length > 0 ? (
             <View style={styles.cardsSection}>
@@ -453,21 +581,32 @@ export default function Schedule() {
                   target={group.pen_name}
                   entries={group.schedules.map((item) => ({
                     id: item.schedule_id,
-                    scheduleTime: formatTo12Hour(item.feeding_time),
+                    scheduleTime: formatTo12Hour(
+                      item.feeding_time
+                    ),
                     status: mapFeedingStatus(item.status),
-                    feedAmountPerPig: item.feed_amount_per_pig,
-                    totalFeedRequired: item.total_feed_required,
-                    feedPerContainer: item.feed_per_container,
+                    feedAmountPerPig:
+                      item.feed_amount_per_pig,
+                    totalFeedRequired:
+                      item.total_feed_required,
+                    feedPerContainer:
+                      item.feed_per_container,
+
                     onEditPress: () =>
                       router.push({
                         pathname: '/schedule/edit-schedule',
                         params: {
-                          schedule_id: String(item.schedule_id),
+                          schedule_id: String(
+                            item.schedule_id
+                          ),
                           mode: 'feeding',
                         },
                       }),
+
                     onDeletePress: () => {
-                      setSelectedScheduleId(item.schedule_id);
+                      setSelectedScheduleId(
+                        item.schedule_id
+                      );
                       setPendingDeleteType('feeding');
                       setShowDeleteModal(true);
                     },
@@ -480,7 +619,10 @@ export default function Schedule() {
           )
         ) : loadingSanitation ? (
           <View style={styles.loadingSection}>
-            <ActivityIndicator size="large" color="#2F5D50" />
+            <ActivityIndicator
+              size="large"
+              color="#2F5D50"
+            />
           </View>
         ) : sanitationSchedules.length > 0 ? (
           <View style={styles.cardsSection}>
@@ -490,21 +632,43 @@ export default function Schedule() {
                 target={group.pen_name}
                 entries={group.schedules.map((item) => ({
                   id: item.sanitation_id,
-                  scheduleTime: formatTo12Hour(item.schedule_time),
-                  durationMinutes: item.duration_minutes,
-                  triggerTemperature: item.trigger_temperature,
-                  status: mapSanitationStatus(item.status),
-                  onEditPress: (sanitation_id: number | string) =>
+                  scheduleTime: formatTo12Hour(
+                    item.schedule_time
+                  ),
+
+                  durationSeconds:
+                    item.duration_seconds === null ||
+                    item.duration_seconds === undefined
+                      ? null
+                      : Number(item.duration_seconds),
+
+                  triggerTemperature:
+                    item.trigger_temperature,
+
+                  status: mapSanitationStatus(
+                    item.status
+                  ),
+
+                  onEditPress: (
+                    sanitation_id: number | string
+                  ) =>
                     router.push({
                       pathname: '/schedule/edit-schedule',
                       params: {
-                        sanitation_id: String(sanitation_id),
+                        sanitation_id: String(
+                          sanitation_id
+                        ),
                         mode: 'sanitation',
                       },
                     }),
+
                   onDeletePress: () => {
-                    setSelectedScheduleId(item.sanitation_id);
-                    setPendingDeleteType('sanitation');
+                    setSelectedScheduleId(
+                      item.sanitation_id
+                    );
+                    setPendingDeleteType(
+                      'sanitation'
+                    );
                     setShowDeleteModal(true);
                   },
                 }))}
@@ -524,7 +688,10 @@ export default function Schedule() {
           setPendingDeleteType(null);
         }}
         onConfirm={() => {
-          if (selectedScheduleId !== null && pendingDeleteType !== null) {
+          if (
+            selectedScheduleId !== null &&
+            pendingDeleteType !== null
+          ) {
             handleDeleteSchedule();
           } else {
             setShowDeleteModal(false);
@@ -532,13 +699,18 @@ export default function Schedule() {
         }}
       />
 
-      <DeleteLoadingModal visible={showDeleteLoadingModal} message={deleteLoadingMessage} />
+      <DeleteLoadingModal
+        visible={showDeleteLoadingModal}
+        message={deleteLoadingMessage}
+      />
 
       <DeleteSuccessModal
         visible={showDeleteSuccessModal}
         title={deleteSuccessTitle}
         message={deleteSuccessMessage}
-        onConfirm={() => setShowDeleteSuccessModal(false)}
+        onConfirm={() =>
+          setShowDeleteSuccessModal(false)
+        }
       />
     </SafeAreaView>
   );
@@ -552,6 +724,7 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
+
   card: {
     width: '100%',
     maxWidth: 320,
@@ -561,11 +734,15 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     shadowColor: '#0F2D24',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 8,
   },
+
   iconCircle: {
     width: 72,
     height: 72,
@@ -575,6 +752,7 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
+
   title: {
     marginTop: 16,
     fontSize: 15,
@@ -583,6 +761,7 @@ const modalStyles = StyleSheet.create({
     fontFamily: 'Inter',
     textAlign: 'center',
   },
+
   message: {
     marginTop: 6,
     fontSize: 13,
@@ -592,6 +771,7 @@ const modalStyles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19,
   },
+
   button: {
     marginTop: 22,
     width: '100%',
@@ -601,6 +781,7 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   buttonText: {
     fontSize: 14,
     fontWeight: '700',

@@ -43,9 +43,6 @@ const FarmerProfileCard: React.FC<FarmerProfileCardProps> = ({
       {/* STATISTICS */}
       <View style={styles.statsRow}>
         <View style={styles.statBlock}>
-          <View style={[styles.statIconWrap, { backgroundColor: '#EAF7F1' }]}>
-            <Ionicons name="home-outline" size={15} color="#2F5D50" />
-          </View>
           <View>
             <Text style={styles.statValue}>
               {totalPigPens != null ? totalPigPens : 'Not Available'}
@@ -57,9 +54,6 @@ const FarmerProfileCard: React.FC<FarmerProfileCardProps> = ({
         <View style={styles.statDivider} />
 
         <View style={styles.statBlock}>
-          <View style={[styles.statIconWrap, { backgroundColor: '#FBEEF1' }]}>
-            <Ionicons name="paw-outline" size={15} color="#D96C8D" />
-          </View>
           <View>
             <Text style={styles.statValue}>
               {totalPigs != null ? totalPigs : 'Not Available'}
@@ -110,7 +104,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   farmerName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A2D27',
     fontFamily: 'Inter',
@@ -122,7 +116,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#8A9994',
     fontFamily: 'Inter',
     fontWeight: '500',
@@ -145,21 +139,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  statIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A2D27',
     fontFamily: 'Inter',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#8A9994',
     fontFamily: 'Inter',
   },

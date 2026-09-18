@@ -18,14 +18,16 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.illustrationWrapper}>
-        <Ionicons name="home-outline" size={40} color="#2F5D50" />
+        {/* Ionicons has no pig/farm-specific icon, so a real pig emoji
+            replaces the previous unrelated "home" icon here. */}
+        <Text style={styles.illustrationEmoji}>🐷</Text>
       </View>
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
       <TouchableOpacity style={styles.addButton} onPress={onAddPress} activeOpacity={0.85}>
-        <Ionicons name="add" size={18} color="#FFFFFF" />
+        <Ionicons name="add" size={19} color="#FFFFFF" />
         <Text style={styles.addButtonText}>{buttonLabel}</Text>
       </TouchableOpacity>
     </View>
@@ -51,17 +53,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D8EAE4',
   },
+  illustrationEmoji: {
+    fontSize: 42,
+    lineHeight: 46,
+  },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
-    color: '#8A9994',
-    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#5F6D69',
+    fontFamily: 'Arial',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -81,9 +87,9 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 });
 

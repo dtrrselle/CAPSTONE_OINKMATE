@@ -128,7 +128,7 @@ const ZERO_CATEGORIES: CategoryAmount[] = CATEGORY_ORDER.map((label) => ({
 }));
 
 // Matches the host used by farmer_login.php — update if this ngrok URL changes.
-const API_BASE_URL = 'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api';
+const API_BASE_URL = 'https://oinkmate.online/oinkmate-api/api';
 
 interface ExpenseSummaryResponse {
   success: boolean;
@@ -142,7 +142,6 @@ interface ExpenseSummaryResponse {
 const HISTORY_DATA: Record<PeriodKey, HistoryItem[]> = {
   today: [
     { key: 't1', icon: 'leaf-outline', category: 'Feed Expense', amount: '₱1,200', date: 'June 29, 2026' },
-    { key: 't2', icon: 'water-outline', category: 'Water Expense', amount: '₱6', date: 'June 29, 2026' },
   ],
   week: [
     { key: 'w1', icon: 'medkit-outline', category: 'Veterinary Expense', amount: '₱500', date: 'June 29, 2026' },
@@ -154,7 +153,6 @@ const HISTORY_DATA: Record<PeriodKey, HistoryItem[]> = {
     { key: 'm2', icon: 'hardware-chip-outline', category: 'Equipment Expense', amount: '₱1,200', date: 'June 28, 2026' },
     { key: 'm3', icon: 'construct-outline', category: 'Maintenance Expense', amount: '₱300', date: 'June 27, 2026' },
     { key: 'm4', icon: 'leaf-outline', category: 'Feed Expense', amount: '₱4,800', date: 'June 25, 2026' },
-    { key: 'm5', icon: 'water-outline', category: 'Water Expense', amount: '₱220', date: 'June 22, 2026' },
   ],
   year: [
     { key: 'y1', icon: 'medkit-outline', category: 'Veterinary Expense', amount: '₱9,800', date: '2026' },
@@ -175,8 +173,8 @@ const AUTO_COMPUTED: AutoComputedItem[] = [
     key: 'water_cost',
     icon: 'water-outline',
     label: 'Water Cost',
-    amount: '₱6.00',
-    note: 'Water flow sensor data',
+    amount: 'No Data',
+    note: 'No Data',
   },
   {
     key: 'electricity_cost',
@@ -198,6 +196,12 @@ export default function Expenses() {
   const [categories, setCategories] = useState<CategoryAmount[]>(ZERO_CATEGORIES);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Water-only: today's actual water consumption/cost from the water
+  // flow sensor pipeline, via get_today_water_usage.php. null means no
+  // real data is available yet (rendered as "No Data" below) — never a
+  // fabricated 0 L / ₱0.00.
+  const [waterData, setWaterData] = useState<{ liters: number; cost: number } | null>(null);
 
   const rawHistory = HISTORY_DATA[period];
 
@@ -244,6 +248,36 @@ export default function Expenses() {
     }
   }, [farmerId]);
 
+  // Water-only: fetch today's actual water consumption/cost. Uses the
+  // existing API base URL and the existing get_today_water_usage.php
+  // endpoint (POST with a JSON farmer_id body, matching that endpoint's
+  // current contract) — no new endpoint, no PHP changes.
+  const fetchWaterUsage = useCallback(async () => {
+    if (!farmerId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/expenses/get_today_water_usage.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ farmer_id: Number(farmerId) }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setWaterData({
+          liters: Number(data.water_liters) || 0,
+          cost: Number(data.water_cost) || 0,
+        });
+      } else {
+        setWaterData(null);
+      }
+    } catch (err) {
+      setWaterData(null);
+    }
+  }, [farmerId]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -268,9 +302,31 @@ export default function Expenses() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, farmerId]);
 
+  // Water-only: today's water usage doesn't depend on the selected
+  // period tab, so it's fetched once when the farmer is known.
+  useEffect(() => {
+    if (farmerId) {
+      fetchWaterUsage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [farmerId]);
+
   const handlePeriodChange = (nextPeriod: PeriodKey) => {
     setPeriod(nextPeriod);
   };
+
+  // Water-only: swap in the live Water item; Feed and Electricity pass
+  // through as the exact same objects, untouched.
+  const autoComputedItems: AutoComputedItem[] = AUTO_COMPUTED.map((item) => {
+    if (item.key !== 'water_cost') {
+      return item;
+    }
+    return {
+      ...item,
+      amount: waterData ? formatPeso(waterData.cost) : 'No Data',
+      note: waterData ? `${waterData.liters} L consumed today` : 'No Data',
+    };
+  });
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -278,10 +334,10 @@ export default function Expenses() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/dashboard'))}
+          onPress={() => router.replace('/(tabs)/reports')}
           activeOpacity={0.8}
         >
-          <Ionicons name="chevron-back" size={18} color="#555" />
+          <Ionicons name="chevron-back" size={18} color="#2F5D50" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Image
@@ -330,7 +386,7 @@ export default function Expenses() {
         <ExpenseHistory rawHistory={rawHistory} today={today} />
 
         {/* SECTION 5 — System Generated Expenses */}
-        <SystemGeneratedExpenses items={AUTO_COMPUTED} />
+        <SystemGeneratedExpenses items={autoComputedItems} />
 
         {/* FUTURE READY — Financial Insights placeholder */}
         <FinancialInsights />
@@ -377,12 +433,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '700',
     color: '#1A2D27',
     letterSpacing: -0.2,
     textAlign: 'center',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   addButton: {
     flexDirection: 'row',
@@ -394,10 +450,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   addButtonText: {
-    fontSize: 12.5,
+    fontSize: 15.5,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Scroll */
@@ -411,10 +467,10 @@ const styles = StyleSheet.create({
   },
 
   errorText: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '600',
     color: '#B45252',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
 

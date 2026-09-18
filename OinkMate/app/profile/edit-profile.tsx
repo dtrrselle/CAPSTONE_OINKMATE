@@ -40,7 +40,7 @@ const FARM_FIELDS: FieldConfig[] = [
 // NOTE: dapat naka-open at naka-RUN yung ngrok tunnel mo (ngrok http <port>)
 // bago mo i-test 'to, kasi kailangan live yung URL na 'to para may sumagot.
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
 
 export default function EditProfile() {
   const router = useRouter();

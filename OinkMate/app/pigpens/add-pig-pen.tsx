@@ -157,16 +157,16 @@ const modalStyles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -186,10 +186,10 @@ const modalStyles = StyleSheet.create({
     borderColor: '#E2EDEA',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '700',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   confirmButton: {
     flex: 1,
@@ -205,10 +205,10 @@ const modalStyles = StyleSheet.create({
     elevation: 4,
   },
   confirmButtonText: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Loading card — mirrors LogoutButton's loading experience */
@@ -233,12 +233,20 @@ const modalStyles = StyleSheet.create({
     gap: 10,
   },
   loadingText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#2F5D50',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 });
+
+const FEED_TYPES = [
+  'Creep Feed',
+  'Pre-Starter Feed',
+  'Starter Feed',
+  'Grower Feed',
+  'Finisher Feed',
+] as const;
 
 export default function AddPigPen() {
   const router = useRouter();
@@ -250,16 +258,17 @@ export default function AddPigPen() {
   const [penName, setPenName] = useState('');
   const [description, setDescription] = useState('');
   const [totalPigs, setTotalPigs] = useState('');
-  // Age in days at registration. The backend derives age_category from this
-  // using feeding_reference.csv — it's never picked manually here.
-  const [pigAgeAtRegistration, setPigAgeAtRegistration] = useState('');
+  const [pigAge, setPigAge] = useState('');
+  const [actualFeedType, setActualFeedType] = useState('');
+  const [feedTypeOpen, setFeedTypeOpen] = useState(false);
   const [deviceCode, setDeviceCode] = useState('');
   const [averageWeight, setAverageWeight] = useState('');
 
   const [penNameError, setPenNameError] = useState('');
   const [totalPigsError, setTotalPigsError] = useState('');
-  const [pigAgeError, setPigAgeError] = useState('');
   const [deviceCodeError, setDeviceCodeError] = useState('');
+  const [pigAgeError, setPigAgeError] = useState('');
+  const [feedTypeError, setFeedTypeError] = useState('');
 
   const [modalStage, setModalStage] = useState<ModalStage>('none');
   const [resultTitle, setResultTitle] = useState('');
@@ -273,10 +282,11 @@ export default function AddPigPen() {
   };
   const validateDeviceCode = (v: string) => (!v.trim() ? 'Device code is required' : '');
   const validatePigAge = (v: string) => {
-    if (!v.trim()) return 'Age in days is required';
-    if (!/^\d+$/.test(v.trim()) || Number(v.trim()) <= 0) return 'Enter a valid age in days';
+    if (!v.trim()) return 'Pig age is required';
+    if (!/^\d+$/.test(v.trim()) || Number(v.trim()) <= 0) return 'Enter a valid pig age in days';
     return '';
   };
+  const validateFeedType = (v: string) => (!v ? 'Feed type is required' : '');
 
   // STEP 1 — validate, then open the confirmation modal. No submit here yet.
   const handleSavePress = () => {
@@ -285,19 +295,22 @@ export default function AddPigPen() {
     const pnErr = validatePenName(penName);
     const tpErr = validateTotalPigs(totalPigs);
     const dcErr = validateDeviceCode(deviceCode);
-    const paErr = validatePigAge(pigAgeAtRegistration);
+    const paErr = validatePigAge(pigAge);
+    const ftErr = validateFeedType(actualFeedType);
 
     setPenNameError(pnErr);
     setTotalPigsError(tpErr);
     setDeviceCodeError(dcErr);
     setPigAgeError(paErr);
+    setFeedTypeError(ftErr);
 
     if (pnErr) console.log("Validation failed: Pen Name required");
     if (tpErr) console.log("Validation failed: " + tpErr);
     if (dcErr) console.log("Validation failed: Device Code required");
     if (paErr) console.log("Validation failed: " + paErr);
+    if (ftErr) console.log("Validation failed: " + ftErr);
 
-    if (pnErr || tpErr || dcErr || paErr) {
+    if (pnErr || tpErr || dcErr || paErr || ftErr) {
       return;
     }
 
@@ -327,7 +340,7 @@ export default function AddPigPen() {
 
       console.log("SENDING REQUEST");
       const response = await fetch(
-        'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api/pig-pens/add_pig_pen.php',
+        'https://oinkmate.online/oinkmate-api/api/pig-pens/add_pig_pen.php',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -337,8 +350,9 @@ export default function AddPigPen() {
             pen_name: penName.trim(),
             description: description.trim(),
             pig_count: Number(totalPigs),
-            pig_age_at_registration: Number(pigAgeAtRegistration),
+            pig_age_at_registration: Number(pigAge),
             avg_weight: averageWeight.trim() ? Number(averageWeight) : null,
+            feed_type: actualFeedType,
           }),
         }
       );
@@ -416,7 +430,6 @@ export default function AddPigPen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView
           style={styles.scroll}
@@ -424,7 +437,7 @@ export default function AddPigPen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-        {/* Pen Name */}
+          {/* Pen Name */}
         <View style={styles.card}>
           <View style={styles.cardLabelRow}>
             <Ionicons name="home-outline" size={15} color="#2F5D50" />
@@ -477,25 +490,80 @@ export default function AddPigPen() {
           {!!totalPigsError && <Text style={styles.fieldError}>{totalPigsError}</Text>}
         </View>
 
-        {/* Age at Registration */}
+        {/* Pig Age (Days) */}
         <View style={styles.card}>
           <View style={styles.cardLabelRow}>
-            <Ionicons name="hourglass-outline" size={15} color="#2F5D50" />
-            <Text style={styles.cardLabel}>Age in Days</Text>
+            <Ionicons name="layers-outline" size={15} color="#2F5D50" />
+            <Text style={styles.cardLabel}>Pig Age (Days)</Text>
           </View>
           <TextInput
             style={styles.textInput}
-            placeholder="Enter the pigs' age in days"
+            placeholder="Enter pig age in days"
             placeholderTextColor="#B0C0BC"
             keyboardType="numeric"
-            value={pigAgeAtRegistration}
-            onChangeText={(v) => { setPigAgeAtRegistration(v); if (pigAgeError) setPigAgeError(validatePigAge(v)); }}
-            onBlur={() => setPigAgeError(validatePigAge(pigAgeAtRegistration))}
+            value={pigAge}
+            onChangeText={(v) => { setPigAge(v); if (pigAgeError) setPigAgeError(validatePigAge(v)); }}
+            onBlur={() => setPigAgeError(validatePigAge(pigAge))}
           />
-          <Text style={styles.helperText}>
-            Growth Stage will be computed automatically based on this age.
-          </Text>
           {!!pigAgeError && <Text style={styles.fieldError}>{pigAgeError}</Text>}
+        </View>
+
+        {/* Feed Type */}
+        <View style={styles.card}>
+          <View style={styles.cardLabelRow}>
+            <Ionicons name="nutrition-outline" size={15} color="#2F5D50" />
+            <Text style={styles.cardLabel}>Feed Type</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.dropdownTrigger}
+            activeOpacity={0.8}
+            onPress={() => setFeedTypeOpen((prev) => !prev)}
+          >
+            <Text style={styles.dropdownTriggerText}>
+              {actualFeedType || 'Select feed type'}
+            </Text>
+            <Ionicons
+              name={feedTypeOpen ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color="#2F5D50"
+            />
+          </TouchableOpacity>
+          {feedTypeOpen && (
+            <View style={styles.dropdownMenu}>
+              {FEED_TYPES.map((option, index) => {
+                const isActive = actualFeedType === option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.dropdownItem,
+                      isActive && styles.dropdownItemActive,
+                      index === FEED_TYPES.length - 1 && { borderBottomWidth: 0 },
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setActualFeedType(option);
+                      setFeedTypeOpen(false);
+                      if (feedTypeError) setFeedTypeError('');
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                    {isActive && (
+                      <Ionicons name="checkmark" size={16} color="#2F5D50" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+          {!!feedTypeError && <Text style={styles.fieldError}>{feedTypeError}</Text>}
         </View>
 
         {/* Device Code */}
@@ -542,7 +610,7 @@ export default function AddPigPen() {
         </TouchableOpacity>
 
         <View style={styles.bottomSpacer} />
-      </ScrollView>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       <StatusModal
@@ -585,10 +653,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.2,
   },
   headerPlaceholder: {
@@ -625,10 +693,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Text Input */
@@ -637,26 +705,26 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    fontSize: 13,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     borderWidth: 1,
     borderColor: '#E2EDEA',
   },
 
   /* Helper Text */
   helperText: {
-    fontSize: 11,
+    fontSize: 14,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     marginTop: -4,
   },
 
   /* Field Error */
   fieldError: {
-    fontSize: 11,
+    fontSize: 14,
     color: '#C0394B',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '500',
     marginTop: -4,
   },
@@ -681,10 +749,10 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownMenu: {
     backgroundColor: '#FFFFFF',
@@ -711,10 +779,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF7F1',
   },
   dropdownItemText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownItemTextActive: {
     color: '#2F5D50',
@@ -738,10 +806,10 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   bottomSpacer: {

@@ -51,7 +51,7 @@ const CATEGORY_ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 // Matches the host used elsewhere in the app — update if this ngrok URL changes.
-const API_BASE_URL = 'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api';
+const API_BASE_URL = 'https://oinkmate.online/oinkmate-api/api';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
