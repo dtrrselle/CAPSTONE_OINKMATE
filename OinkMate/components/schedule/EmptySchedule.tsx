@@ -18,14 +18,14 @@ const EmptySchedule: React.FC<EmptyScheduleProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.illustrationWrapper}>
-        <Ionicons name="calendar-outline" size={40} color="#2F5D50" />
+        <Ionicons name="calendar-clear-outline" size={42} color="#2F5D50" />
       </View>
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
       <TouchableOpacity style={styles.addButton} onPress={onAddPress} activeOpacity={0.85}>
-        <Ionicons name="add" size={18} color="#FFFFFF" />
+        <Ionicons name="add" size={20} color="#FFFFFF" />
         <Text style={styles.addButtonText}>{buttonLabel}</Text>
       </TouchableOpacity>
     </View>
@@ -52,18 +52,19 @@ const styles = StyleSheet.create({
     borderColor: '#D8EAE4',
   },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
     marginBottom: 16,
+    lineHeight: 21,
   },
   addButton: {
     flexDirection: 'row',
@@ -81,9 +82,9 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 });
 

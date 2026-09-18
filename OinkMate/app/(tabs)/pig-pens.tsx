@@ -21,10 +21,10 @@ import PigPenCard, { GrowthStage } from '../../components/pig-pens/PigPenCard';
 import DeletePigPenModal from '../../components/pig-pens/DeletePigPenModal';
 
 const API_BASE =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api/pig-pens';
+  'https://oinkmate.online/oinkmate-api/api/pig-pens';
 
 const ENVIRONMENT_API_BASE =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api/iot/environment';
+  'https://oinkmate.online/oinkmate-api/api/iot/environment';
 
 // How often (ms) to auto-refresh pig pens + latest environmental/feed
 // data while this screen is focused. Roughly matches how often the
@@ -43,6 +43,7 @@ interface PigPen {
   currentAge: string;
   growthStage: GrowthStage;
   feedType: string;
+  actualFeedType: string;
   recommendedFeed: number;
   source: string;
   // Latest environmental/feed readings, merged in from
@@ -54,7 +55,6 @@ interface PigPen {
   ammonia?: string;
   feed_level_1?: number;
   feed_level_2?: number;
-  feed_level_3?: number;
   overall_level?: number;
   last_updated?: string | null;
 }
@@ -67,10 +67,23 @@ interface LatestEnvironmentRecord {
   ammonia: number | null;
   feed_level_1: number | null;
   feed_level_2: number | null;
-  feed_level_3: number | null;
   overall_level: number | null;
   last_updated: string | null;
 }
+
+// The main Feed reading is now the average of Container 1 and Container 2
+// only (the hardware dropped Container 3). Returns undefined - never NaN -
+// whenever either container reading is unavailable, so PigPenCard's
+// existing "No Data" handling takes over for the main Feed value.
+const computeAverageFeedLevel = (
+  feedLevel1: number | undefined,
+  feedLevel2: number | undefined
+): number | undefined => {
+  if (typeof feedLevel1 !== 'number' || typeof feedLevel2 !== 'number') {
+    return undefined;
+  }
+  return (feedLevel1 + feedLevel2) / 2;
+};
 
 export default function PigPens() {
   const router = useRouter();
@@ -165,7 +178,6 @@ export default function PigPens() {
           ammonia: env.ammonia !== null ? `${env.ammonia}` : undefined,
           feed_level_1: env.feed_level_1 ?? undefined,
           feed_level_2: env.feed_level_2 ?? undefined,
-          feed_level_3: env.feed_level_3 ?? undefined,
           overall_level: env.overall_level ?? undefined,
           last_updated: env.last_updated,
         };
@@ -348,13 +360,13 @@ export default function PigPens() {
                 pigCount={pen.pig_count ?? 0}
                 growthStage={pen.growthStage}
                 currentAge={pen.currentAge}
+                actualFeedType={pen.actualFeedType}
                 temperature={pen.temperature ?? 'No Data'}
                 humidity={pen.humidity ?? 'No Data'}
                 ammonia={pen.ammonia ?? 'No Data'}
-                feedLevel={pen.overall_level}
+                feedLevel={computeAverageFeedLevel(pen.feed_level_1, pen.feed_level_2)}
                 feedLevel1={pen.feed_level_1}
                 feedLevel2={pen.feed_level_2}
-                feedLevel3={pen.feed_level_3}
                 isDeleting={isDeleting && penToDelete?.pen_id === pen.pen_id}
                 onEditPress={() => {
                   console.log('EDIT PEN:', pen);

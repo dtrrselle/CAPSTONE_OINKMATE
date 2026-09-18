@@ -21,6 +21,8 @@ interface QuickAccessItem {
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
+// All ordinary Quick Access icons share the same primary GREEN accent for
+// visual consistency — only status indicators elsewhere keep semantic colors.
 
 const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
   {
@@ -36,16 +38,16 @@ const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     icon: 'leaf-outline',
     title: 'Environment',
     description: 'Live monitoring',
-    accentColor: '#3A7D68',
-    iconBg: '#E4F2EE',
+    accentColor: '#2F5D50',
+    iconBg: '#EAF7EF',
   },
   {
     id: 'feeding',
     icon: 'restaurant-outline',
     title: 'Feeding',
     description: 'View schedules',
-    accentColor: '#C2547A',
-    iconBg: '#FDEDF3',
+    accentColor: '#2F5D50',
+    iconBg: '#EAF7EF',
   },
   {
     id: 'sanitation',
@@ -60,16 +62,16 @@ const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     icon: 'cash-outline',
     title: 'Expenses',
     description: 'Track farm costs',
-    accentColor: '#7B5EA7',
-    iconBg: '#F0EBF9',
+    accentColor: '#2F5D50',
+    iconBg: '#EAF7EF',
   },
   {
     id: 'learning-center',
     icon: 'book-outline',
     title: 'Learning Center',
     description: 'Guides & tips',
-    accentColor: '#B45309',
-    iconBg: '#FEF3C7',
+    accentColor: '#2F5D50',
+    iconBg: '#EAF7EF',
   },
 ];
 
@@ -206,9 +208,10 @@ const styles = StyleSheet.create({
   },
 
   sectionLabel: {
-    fontSize: 11,
+    fontFamily: 'Arial',
+    fontSize: 12,
     fontWeight: '700',
-    color: '#9AACAB',
+    color: '#8B9693',
     letterSpacing: 0.9,
     textTransform: 'uppercase',
     marginBottom: 14,
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'column',
     justifyContent: 'space-between',
-    minHeight: 130,
+    minHeight: 136,
     borderWidth: 1,
 
     shadowColor: '#000',
@@ -252,16 +255,18 @@ const styles = StyleSheet.create({
   },
 
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontFamily: 'Arial',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#1A2D27',
   },
 
   cardDescription: {
-    fontSize: 11,
+    fontFamily: 'Arial',
+    fontSize: 12,
     fontWeight: '400',
-    color: '#A0AAB3',
-    lineHeight: 15,
+    color: '#8B9693',
+    lineHeight: 16,
   },
 
   arrowChip: {

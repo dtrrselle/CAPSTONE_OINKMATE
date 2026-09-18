@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import SystemStatusBanner from '@/components/dashboard/SystemStatusBanner';
 import FarmOverview from '@/components/dashboard/FarmOverview';
 import QuickAccessGrid from '@/components/dashboard/QuickAccessGrid';
-import RecentAlerts from '@/components/dashboard/RecentAlerts';
+
 
 interface StoredUser {
   user_id?: number;
@@ -34,7 +35,7 @@ const ZERO_FARM_OVERVIEW: FarmOverviewData = {
 
 // Matches the host used by the other API calls in this app — update if this
 // ngrok URL changes.
-const API_BASE_URL = 'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api/api';
+const API_BASE_URL = 'https://oinkmate.online/oinkmate-api/api';
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', {
@@ -57,6 +58,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [now, setNow] = useState(new Date());
   const [farmOverview, setFarmOverview] = useState<FarmOverviewData>(ZERO_FARM_OVERVIEW);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Load the logged-in user's session from AsyncStorage.
   useEffect(() => {
@@ -109,6 +111,48 @@ export default function Dashboard() {
     loadFarmOverview();
   }, [user?.farmer_id]);
 
+  // Load the unread notification count for the bell badge. Kept separate
+  // from Farm Overview on purpose — different endpoint, different concern.
+  const loadUnreadNotifications = useCallback(async () => {
+    if (!user?.farmer_id) return;
+
+    try {
+      const url = `${API_BASE_URL}/notifications/get_notifications.php?farmer_id=${encodeURIComponent(
+        String(user.farmer_id)
+      )}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success && Array.isArray(data.notifications)) {
+        const unread = data.notifications.filter(
+          (notification: { status?: string }) => notification.status === 'unread'
+        ).length;
+        setUnreadCount(unread);
+      } else {
+        // Keep showing zero rather than surfacing an error on the dashboard.
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.log('Error loading notifications:', error);
+      // Retain the existing valid unread count rather than crashing or
+      // flashing to zero on a transient network error.
+    }
+  }, [user?.farmer_id]);
+
+  // Initial load once we know who the logged-in farmer is.
+  useEffect(() => {
+    loadUnreadNotifications();
+  }, [loadUnreadNotifications]);
+
+  // Refresh the unread count whenever the Dashboard screen regains focus
+  // (e.g. returning from the Notifications screen after reading/marking
+  // items as read). Focus-triggered only — no polling/timer.
+  useFocusEffect(
+    useCallback(() => {
+      loadUnreadNotifications();
+    }, [loadUnreadNotifications])
+  );
+
   // Keep the date/time displayed in the header up to date.
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
@@ -122,6 +166,7 @@ export default function Dashboard() {
         farmerName={user?.fullname}
         currentDate={formatDate(now)}
         currentTime={formatTime(now)}
+        unreadCount={unreadCount}
         onNotificationPress={() =>
           router.push('/notifications/notifications')
         }
@@ -143,7 +188,7 @@ export default function Dashboard() {
 
        
 
-        <RecentAlerts />
+      
       </ScrollView>
     </SafeAreaView>
   );

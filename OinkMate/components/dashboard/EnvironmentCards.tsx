@@ -22,7 +22,7 @@ interface EnvironmentCard {
   trendLabel: string;
 }
 
-// ─── Status Config ────────────────────────────────────────────────────────────
+// ─── Status Config (semantic — do not force to green) ─────────────────────────
 
 const STATUS_CONFIG: Record<
   StatusLevel,
@@ -144,9 +144,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionLabel: {
-    fontSize: 11,
+    fontFamily: 'Arial',
+    fontSize: 12,
     fontWeight: '700',
-    color: '#9AACAB',
+    color: '#8B9693',
     letterSpacing: 0.9,
     textTransform: 'uppercase',
   },
@@ -166,7 +167,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#34C759',
   },
   liveText: {
-    fontSize: 10,
+    fontFamily: 'Arial',
+    fontSize: 11,
     fontWeight: '700',
     color: '#2F5D50',
   },
@@ -178,7 +180,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     paddingBottom: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
@@ -202,9 +204,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   cardTitle: {
-    fontSize: 10,
+    fontFamily: 'Arial',
+    fontSize: 11,
     fontWeight: '600',
-    color: '#A0AAB3',
+    color: '#5F6D69',
     textAlign: 'center',
     marginBottom: 6,
     letterSpacing: 0.2,
@@ -216,13 +219,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   cardValue: {
-    fontSize: 22,
+    fontFamily: 'Arial',
+    fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
-    lineHeight: 26,
+    lineHeight: 28,
   },
   cardUnit: {
-    fontSize: 11,
+    fontFamily: 'Arial',
+    fontSize: 12,
     fontWeight: '600',
     marginBottom: 3,
   },
@@ -241,14 +246,16 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 9,
+    fontFamily: 'Arial',
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
   trendText: {
-    fontSize: 9,
+    fontFamily: 'Arial',
+    fontSize: 10,
     fontWeight: '400',
-    color: '#B0B8BF',
+    color: '#9AA8A4',
     textAlign: 'center',
   },
 });

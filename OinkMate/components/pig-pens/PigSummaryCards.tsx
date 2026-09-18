@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface SummaryCardData {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
+  mcIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  emoji?: string;
   label: string;
   value: string | number;
   iconColor: string;
@@ -24,6 +26,13 @@ interface PigSummaryCardsProps {
 // Pre-Starter, Starter, Grower, and Finisher counts come from the backend
 // Recommendation Engine (feeding_reference.csv) via pen.growthStage — no
 // values are hardcoded here anymore, so callers must pass real counts.
+//
+// Total Pigs uses MaterialCommunityIcons' "pig" glyph (same family as
+// Ionicons within @expo/vector-icons) so it visually matches the Dashboard's
+// Total Pigs icon. Total Pens keeps its own grid icon representing
+// pens/structure. The five growth-stage cards below are intentionally
+// icon-less — they previously repeated the same pig icon on every card,
+// which was redundant.
 const PigSummaryCards: React.FC<PigSummaryCardsProps> = ({
   totalPens = 0,
   totalPigs = 0,
@@ -35,38 +44,36 @@ const PigSummaryCards: React.FC<PigSummaryCardsProps> = ({
 }) => {
   const topCards: SummaryCardData[] = [
     {
-      icon: 'home-outline',
+      icon: 'grid-outline',
       label: 'Total Pens',
       value: totalPens,
       iconColor: '#2F5D50',
       iconBg: '#EAF7F1',
     },
     {
-      icon: 'paw-outline',
+      mcIcon: 'pig',
       label: 'Total Pigs',
       value: totalPigs,
-      iconColor: '#D96C8D',
-      iconBg: '#FBEEF1',
+      iconColor: '#2F5D50',
+      iconBg: '#EAF7F1',
     },
   ];
 
+  // Growth-stage cards intentionally have no icon field — see note above.
   const stageRowOneCards: SummaryCardData[] = [
     {
-      icon: 'egg-outline',
       label: 'Creep Pens',
       value: creepPens,
       iconColor: '#2F5D50',
       iconBg: '#EAF7F1',
     },
     {
-      icon: 'sparkles-outline',
       label: 'Pre-Starter Pens',
       value: preStarterPens,
-      iconColor: '#D96C8D',
-      iconBg: '#FBEEF1',
+      iconColor: '#2F5D50',
+      iconBg: '#EAF7F1',
     },
     {
-      icon: 'rocket-outline',
       label: 'Starter Pens',
       value: starterPens,
       iconColor: '#2F5D50',
@@ -76,14 +83,12 @@ const PigSummaryCards: React.FC<PigSummaryCardsProps> = ({
 
   const stageRowTwoCards: SummaryCardData[] = [
     {
-      icon: 'leaf-outline',
       label: 'Grower Pens',
       value: growerPens,
-      iconColor: '#D96C8D',
-      iconBg: '#FBEEF1',
+      iconColor: '#2F5D50',
+      iconBg: '#EAF7F1',
     },
     {
-      icon: 'trending-up-outline',
       label: 'Finisher Pens',
       value: finisherPens,
       iconColor: '#2F5D50',
@@ -91,42 +96,39 @@ const PigSummaryCards: React.FC<PigSummaryCardsProps> = ({
     },
   ];
 
+  const renderCard = (card: SummaryCardData) => {
+    const hasIcon = Boolean(card.mcIcon || card.emoji || card.icon);
+    return (
+      <View key={card.label} style={styles.card}>
+        {hasIcon && (
+          <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
+            {card.mcIcon ? (
+              <MaterialCommunityIcons name={card.mcIcon} size={17} color={card.iconColor} />
+            ) : card.emoji ? (
+              <Text style={styles.iconEmoji}>{card.emoji}</Text>
+            ) : (
+              card.icon && <Ionicons name={card.icon} size={17} color={card.iconColor} />
+            )}
+          </View>
+        )}
+        <Text style={styles.value}>{card.value}</Text>
+        <Text style={styles.label}>{card.label}</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        {topCards.map((card) => (
-          <View key={card.label} style={styles.card}>
-            <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-              <Ionicons name={card.icon} size={16} color={card.iconColor} />
-            </View>
-            <Text style={styles.value}>{card.value}</Text>
-            <Text style={styles.label}>{card.label}</Text>
-          </View>
-        ))}
+        {topCards.map(renderCard)}
       </View>
 
       <View style={[styles.row, styles.bottomRow]}>
-        {stageRowOneCards.map((card) => (
-          <View key={card.label} style={styles.card}>
-            <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-              <Ionicons name={card.icon} size={16} color={card.iconColor} />
-            </View>
-            <Text style={styles.value}>{card.value}</Text>
-            <Text style={styles.label}>{card.label}</Text>
-          </View>
-        ))}
+        {stageRowOneCards.map(renderCard)}
       </View>
 
       <View style={[styles.row, styles.bottomRow]}>
-        {stageRowTwoCards.map((card) => (
-          <View key={card.label} style={styles.card}>
-            <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-              <Ionicons name={card.icon} size={16} color={card.iconColor} />
-            </View>
-            <Text style={styles.value}>{card.value}</Text>
-            <Text style={styles.label}>{card.label}</Text>
-          </View>
-        ))}
+        {stageRowTwoCards.map(renderCard)}
       </View>
     </View>
   );
@@ -161,24 +163,28 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconEmoji: {
+    fontSize: 17,
+    lineHeight: 19,
+  },
   value: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.3,
   },
   label: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#8A9994',
-    fontFamily: 'Inter',
+    color: '#5F6D69',
+    fontFamily: 'Arial',
   },
 });
 

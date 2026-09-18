@@ -8,11 +8,28 @@ type ScheduleStatus = 'Upcoming' | 'Completed' | 'Missed' | 'Active';
 export interface SanitationScheduleEntry {
   id: number | string;
   scheduleTime?: string;
-  durationMinutes?: number | null;
+  durationSeconds?: number | null;
   triggerTemperature?: number | null;
   status?: ScheduleStatus;
   onEditPress?: (sanitationId: number | string) => void;
   onDeletePress?: () => void;
+}
+
+// Converts total seconds into a short readable duration label.
+// Examples: 150 -> "2 mins 30 secs", 60 -> "1 min", 30 -> "30 secs", 900 -> "15 mins"
+function formatDuration(durationSeconds?: number | null): string {
+  if (durationSeconds === null || durationSeconds === undefined) return 'Not Set';
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = durationSeconds % 60;
+
+  const minutesLabel = minutes > 0 ? `${minutes} ${minutes === 1 ? 'min' : 'mins'}` : '';
+  const secondsLabel = seconds > 0 ? `${seconds} ${seconds === 1 ? 'sec' : 'secs'}` : '';
+
+  if (minutesLabel && secondsLabel) return `${minutesLabel} ${secondsLabel}`;
+  if (minutesLabel) return minutesLabel;
+  if (secondsLabel) return secondsLabel;
+  return '0 secs';
 }
 
 interface SanitationScheduleCardProps {
@@ -39,7 +56,7 @@ const SanitationScheduleCard: React.FC<SanitationScheduleCardProps> = ({
       <View style={styles.topRow}>
         <View style={styles.titleBlock}>
           <View style={styles.iconWrap}>
-            <Ionicons name="water-outline" size={17} color="#2F5D50" />
+            <Ionicons name="water-outline" size={19} color="#2F5D50" />
           </View>
           <Text style={styles.title}>{target}</Text>
         </View>
@@ -52,10 +69,7 @@ const SanitationScheduleCard: React.FC<SanitationScheduleCardProps> = ({
           entry.triggerTemperature === null || entry.triggerTemperature === undefined
             ? 'Not Set'
             : `${entry.triggerTemperature}°C`;
-        const durationLabel =
-          entry.durationMinutes === null || entry.durationMinutes === undefined
-            ? 'Not Set'
-            : `${entry.durationMinutes} mins`;
+        const durationLabel = formatDuration(entry.durationSeconds);
 
         return (
           <React.Fragment key={entry.id}>
@@ -64,7 +78,7 @@ const SanitationScheduleCard: React.FC<SanitationScheduleCardProps> = ({
             <View style={styles.entryBlock}>
               <View style={styles.entryTopRow}>
                 <View style={styles.detailRow}>
-                  <Ionicons name="time-outline" size={14} color="#A0B5AD" />
+                  <Ionicons name="time-outline" size={16} color="#3E7D68" />
                   <Text style={styles.detailText}>Schedule Time: {entry.scheduleTime ?? '7:00 AM'}</Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -77,11 +91,11 @@ const SanitationScheduleCard: React.FC<SanitationScheduleCardProps> = ({
 
               <View style={styles.detailsBlock}>
                 <View style={styles.detailRow}>
-                  <Ionicons name="thermometer-outline" size={14} color="#A0B5AD" />
+                  <Ionicons name="thermometer-outline" size={16} color="#3E7D68" />
                   <Text style={styles.detailText}>Trigger Temperature: {triggerTemperatureLabel}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Ionicons name="timer-outline" size={14} color="#A0B5AD" />
+                  <Ionicons name="timer-outline" size={16} color="#3E7D68" />
                   <Text style={styles.detailText}>Duration: {durationLabel}</Text>
                 </View>
               </View>
@@ -92,11 +106,11 @@ const SanitationScheduleCard: React.FC<SanitationScheduleCardProps> = ({
                   onPress={() => entry.onEditPress?.(entry.id)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="create-outline" size={14} color="#2F5D50" />
+                  <Ionicons name="create-outline" size={16} color="#2F5D50" />
                   <Text style={styles.editButtonText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.deleteButton} onPress={entry.onDeletePress} activeOpacity={0.8}>
-                  <Ionicons name="trash-outline" size={14} color="#D96C8D" />
+                  <Ionicons name="trash-outline" size={16} color="#E23744" />
                   <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -146,28 +160,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: 20,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
   },
   statusDot: {
-    width: 5,
-    height: 5,
+    width: 6,
+    height: 6,
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Divider between grouped schedule entries within the same Pen card */
@@ -195,9 +209,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   detailText: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     fontWeight: '500',
   },
 
@@ -212,36 +226,36 @@ const styles = StyleSheet.create({
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: '#F4F8F6',
     borderRadius: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#DCEAE5',
   },
   editButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#2F5D50',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FCF0F3',
+    gap: 6,
+    backgroundColor: '#FDECEC',
     borderRadius: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#F6DCE3',
+    borderColor: '#F8D3D3',
   },
   deleteButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#D96C8D',
-    fontFamily: 'Inter',
+    color: '#E23744',
+    fontFamily: 'Arial',
   },
 });
 

@@ -32,7 +32,7 @@ const PigPensHeader: React.FC<PigPensHeaderProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Add Pen"
         >
-          <Ionicons name="add" size={18} color="#FFFFFF" />
+          <Ionicons name="add" size={19} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Add Pen</Text>
         </TouchableOpacity>
       </View>
@@ -89,26 +89,26 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   titleBlock: {
     gap: 3,
   },
   title: {
-    fontSize: 26,
+    fontSize: 29,
     fontWeight: '800',
     color: '#1A2D27',
     letterSpacing: -0.4,
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#8A9994',
-    fontFamily: 'Inter',
+    color: '#5F6D69',
+    fontFamily: 'Arial',
   },
 });
 

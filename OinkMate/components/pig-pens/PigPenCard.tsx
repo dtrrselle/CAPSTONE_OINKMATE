@@ -1,23 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-// Enable smooth LayoutAnimation-driven expand/collapse on Android (iOS
-// supports it out of the box).
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 export type GrowthStage = 'Creep' | 'Pre-Starter' | 'Starter' | 'Grower' | 'Finisher';
 type FeedStatus = 'Normal' | 'Low Feed' | 'Refill Needed';
@@ -33,11 +16,11 @@ interface PigPenCardProps {
   temperature?: string;
   humidity?: string;
   ammonia?: string;
-  feedLevel?: number | null;
-  feedLevel1?: number | null;
-  feedLevel2?: number | null;
-  feedLevel3?: number | null;
+  feedLevel?: number;
+  feedLevel1?: number;
+  feedLevel2?: number;
   feedStatus?: FeedStatus;
+  actualFeedType?: string;
   isDeleting?: boolean;
   onEditPress?: () => void;
   onDeletePress?: () => void;
@@ -60,24 +43,6 @@ const FEED_STATUS_CONFIG: Record<FeedStatus, { color: string; barColor: string }
   'Refill Needed': { color: '#C62828', barColor: '#E53935' },
 };
 
-// Sensor readings are raw distance measurements for now (not yet
-// converted into a true fill level), so displayed percentages are
-// clamped to a sane 0-100 range to avoid bars/labels overflowing past
-// 100%. The real distance-to-level formula will replace this later.
-const clampPercent = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
-
-const getContainerBarColor = (level: number) => {
-  if (level <= 20) return '#E53935';
-  if (level <= 50) return '#FF9500';
-  return '#34C759';
-};
-
-// Distinguishes "no sensor reading" from an actual 0% reading, so the
-// Feed section can show "No Data" the same way Temperature/Humidity/
-// Ammonia already do, instead of fabricating a percentage.
-const hasReading = (value: number | null | undefined): value is number =>
-  value !== null && value !== undefined;
-
 const PigPenCard: React.FC<PigPenCardProps> = ({
   penName = 'Pen A',
   location = 'Main Barn',
@@ -89,39 +54,36 @@ const PigPenCard: React.FC<PigPenCardProps> = ({
   temperature = '28°C',
   humidity = '65%',
   ammonia = '12 ppm',
-  feedLevel,
   feedLevel1,
   feedLevel2,
-  feedLevel3,
-  feedStatus = 'Normal',
+  feedStatus,
+  actualFeedType,
   isDeleting = false,
   onEditPress,
   onDeletePress,
   onViewDetailsPress,
 }) => {
   const growthStageStyle = GROWTH_STAGE_COLORS[growthStage] ?? GROWTH_STAGE_COLORS.Finisher;
-  const feedCfg = FEED_STATUS_CONFIG[feedStatus] ?? FEED_STATUS_CONFIG['Normal'];
 
-  // Only clamp/display a percentage when actual sensor data exists.
-  // Container levels are never defaulted to the overall feed level -
-  // each field independently shows "No Data" when its own reading is
-  // missing, matching how Temperature/Humidity/Ammonia already behave.
-  const hasOverallLevel = hasReading(feedLevel);
-  const displayFeedLevel = hasOverallLevel ? clampPercent(feedLevel) : null;
+  // Feed card container inspector — tapping the "Feed" label opens a
+  // small modal showing each container's own reading. Purely
+  // informational; it never affects the main average shown on the card.
+  const [containerDropdownOpen, setContainerDropdownOpen] = useState(false);
 
-  const hasContainer1 = hasReading(feedLevel1);
-  const hasContainer2 = hasReading(feedLevel2);
-  const hasContainer3 = hasReading(feedLevel3);
-  const container1Level = hasContainer1 ? clampPercent(feedLevel1) : null;
-  const container2Level = hasContainer2 ? clampPercent(feedLevel2) : null;
-  const container3Level = hasContainer3 ? clampPercent(feedLevel3) : null;
+  // Main Feed value is always the average of Container 1 (feedLevel1) and
+  // Container 2 (feedLevel2) — never feedLevel3, never the old feedLevel
+  // prop. Both readings must be valid numbers or the result is "No Data".
+  const hasFeedLevel1 = typeof feedLevel1 === 'number';
+  const hasFeedLevel2 = typeof feedLevel2 === 'number';
+  const averageFeedLevel =
+    hasFeedLevel1 && hasFeedLevel2
+      ? Math.min(100, Math.max(0, ((feedLevel1 as number) + (feedLevel2 as number)) / 2))
+      : null;
+  const hasAverage = averageFeedLevel !== null;
 
-  const [showContainers, setShowContainers] = useState(false);
-
-  const toggleContainers = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowContainers((prev) => !prev);
-  };
+  // Status coloring only applies when there's a valid average AND the
+  // parent supplied a feedStatus derived from that same average.
+  const feedCfg = hasAverage && feedStatus ? FEED_STATUS_CONFIG[feedStatus] : null;
 
   return (
     <View style={styles.card}>
@@ -131,7 +93,7 @@ const PigPenCard: React.FC<PigPenCardProps> = ({
         <View style={styles.topTextBlock}>
           <Text style={styles.penName}>{penName}</Text>
           <View style={styles.deviceCodeRow}>
-            <Ionicons name="hardware-chip-outline" size={11} color="#A0B5AD" />
+            <Ionicons name="hardware-chip-outline" size={12} color="#2F5D50" />
             <Text style={styles.deviceCodeText}>{deviceCode}</Text>
           </View>
         </View>
@@ -151,117 +113,94 @@ const PigPenCard: React.FC<PigPenCardProps> = ({
           <Text style={styles.keyInfoValue}>{currentAge}</Text>
           <Text style={styles.keyInfoLabel}>Current Age</Text>
         </View>
+        <View style={styles.keyInfoDivider} />
+        <View style={styles.keyInfoItem}>
+          <Text style={styles.keyInfoValue}>{actualFeedType ?? '—'}</Text>
+          <Text style={styles.keyInfoLabel}>Actual Feed</Text>
+        </View>
       </View>
 
       {/* ENVIRONMENT + FEED LEVEL */}
       <View style={styles.envRow}>
         <View style={styles.envCard}>
-          <View style={[styles.envIconWrap, { backgroundColor: '#FCEAE5' }]}>
-            <Ionicons name="thermometer-outline" size={14} color="#E07A5F" />
+          <View style={[styles.envIconWrap, { backgroundColor: '#EAF7F1' }]}>
+            <Ionicons name="thermometer-outline" size={15} color="#2F5D50" />
           </View>
           <Text style={styles.envValue}>{temperature}</Text>
           <Text style={styles.envLabel}>Temp</Text>
         </View>
         <View style={styles.envCard}>
-          <View style={[styles.envIconWrap, { backgroundColor: '#E8F1FB' }]}>
-            <Ionicons name="water-outline" size={14} color="#3B82C4" />
+          <View style={[styles.envIconWrap, { backgroundColor: '#EAF7F1' }]}>
+            <Ionicons name="water-outline" size={15} color="#2F5D50" />
           </View>
           <Text style={styles.envValue}>{humidity}</Text>
           <Text style={styles.envLabel}>Humidity</Text>
         </View>
         <View style={styles.envCard}>
-          <View style={[styles.envIconWrap, { backgroundColor: '#EFEFF3' }]}>
-            <Ionicons name="cloud-outline" size={14} color="#8A8FA3" />
+          <View style={[styles.envIconWrap, { backgroundColor: '#EAF7F1' }]}>
+            <Ionicons name="cloud-outline" size={15} color="#2F5D50" />
           </View>
           <Text style={styles.envValue}>{ammonia}</Text>
           <Text style={styles.envLabel}>Ammonia</Text>
         </View>
         <View style={[styles.envCard, styles.feedCard]}>
-          <View style={[styles.envIconWrap, { backgroundColor: '#FFF4E0' }]}>
-            <Ionicons name="nutrition-outline" size={14} color="#C97A00" />
+          <View style={[styles.envIconWrap, { backgroundColor: '#EAF7F1' }]}>
+            <Ionicons name="nutrition-outline" size={15} color="#2F5D50" />
           </View>
-          {hasOverallLevel ? (
-            <>
-              <Text style={[styles.envValue, { color: feedCfg.barColor }]}>{displayFeedLevel}%</Text>
-              <Text style={styles.envLabel}>Feed</Text>
-              <View style={styles.feedMiniBar}>
-                <View style={[styles.feedMiniBarFill, { width: `${displayFeedLevel}%` as any, backgroundColor: feedCfg.barColor }]} />
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={styles.envValue}>No Data</Text>
-              <Text style={styles.envLabel}>Feed</Text>
-            </>
+          <Text style={[styles.envValue, hasAverage && feedCfg ? { color: feedCfg.barColor } : null]}>
+            {hasAverage ? `${(averageFeedLevel as number).toFixed(2)}%` : 'No Data'}
+          </Text>
+          <TouchableOpacity
+            style={styles.feedLabelRow}
+            activeOpacity={0.7}
+            onPress={() => setContainerDropdownOpen(true)}
+          >
+            <Text style={styles.envLabel}>Feed</Text>
+            <Ionicons name="chevron-down" size={10} color="#5F6D69" />
+          </TouchableOpacity>
+          {hasAverage && (
+            <View style={styles.feedMiniBar}>
+              <View
+                style={[
+                  styles.feedMiniBarFill,
+                  { width: `${Math.min(100, Math.max(0, averageFeedLevel as number))}%` as any, backgroundColor: feedCfg?.barColor ?? '#8A9994' },
+                ]}
+              />
+            </View>
           )}
         </View>
       </View>
 
-      {/* FEED CONTAINERS ACCORDION — full-width, belongs to the card as a
-          whole rather than the small Feed summary tile, so expanding it
-          doesn't stretch/narrow the 4-card environment row. */}
-      <View style={styles.accordion}>
+      {/* FEED CONTAINER SELECTOR MODAL */}
+      <Modal
+        visible={containerDropdownOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContainerDropdownOpen(false)}
+      >
         <TouchableOpacity
-          style={styles.accordionHeader}
-          onPress={toggleContainers}
-          activeOpacity={0.7}
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setContainerDropdownOpen(false)}
         >
-          <View style={styles.accordionHeaderLeft}>
-            <View style={styles.accordionIconWrap}>
-              <Ionicons name="cube-outline" size={13} color="#C97A00" />
-            </View>
-            <Text style={styles.accordionTitle}>Feed Containers</Text>
-          </View>
-          <Ionicons
-            name={showContainers ? 'chevron-up' : 'chevron-down'}
-            size={16}
-            color="#A0B5AD"
-          />
-        </TouchableOpacity>
-
-        {showContainers && (
-          <View style={styles.accordionBody}>
-            {[
-              { label: 'Container 1', level: container1Level, hasData: hasContainer1 },
-              { label: 'Container 2', level: container2Level, hasData: hasContainer2 },
-              { label: 'Container 3', level: container3Level, hasData: hasContainer3 },
-            ].map((container, index, arr) => {
-              const barColor = container.hasData ? getContainerBarColor(container.level as number) : '#B0C0BC';
+          <View style={styles.menu}>
+            <Text style={styles.menuTitle}>Feed Containers</Text>
+            {(['Container 1', 'Container 2'] as const).map((label) => {
+              const value = label === 'Container 1' ? feedLevel1 : feedLevel2;
+              const valueText =
+                typeof value === 'number'
+                  ? `${Math.min(100, Math.max(0, value)).toFixed(2)}%`
+                  : 'No Data';
               return (
-                <View
-                  key={container.label}
-                  style={[
-                    styles.containerRow,
-                    index !== arr.length - 1 && styles.containerRowDivider,
-                  ]}
-                >
-                  <View style={[styles.containerIconWrap, { backgroundColor: container.hasData ? `${barColor}1A` : '#F0F3F2' }]}>
-                    <Ionicons name="cube-outline" size={11} color={barColor} />
-                  </View>
-                  <View style={styles.containerBarBlock}>
-                    <View style={styles.containerLabelRow}>
-                      <Text style={styles.containerLabel}>{container.label}</Text>
-                      <Text style={[styles.containerPercent, container.hasData && { color: barColor }]}>
-                        {container.hasData ? `${container.level}%` : 'No Data'}
-                      </Text>
-                    </View>
-                    {container.hasData && (
-                      <View style={styles.containerBarTrack}>
-                        <View
-                          style={[
-                            styles.containerBarFill,
-                            { width: `${container.level}%` as any, backgroundColor: barColor },
-                          ]}
-                        />
-                      </View>
-                    )}
-                  </View>
+                <View key={label} style={styles.menuOption}>
+                  <Text style={styles.menuOptionText}>{label}</Text>
+                  <Text style={styles.menuOptionValueText}>{valueText}</Text>
                 </View>
               );
             })}
           </View>
-        )}
-      </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* FOOTER */}
       <View style={styles.footerRow}>
@@ -271,7 +210,7 @@ const PigPenCard: React.FC<PigPenCardProps> = ({
           activeOpacity={0.8}
           disabled={isDeleting}
         >
-          <Ionicons name="create-outline" size={14} color="#2F5D50" />
+          <Ionicons name="create-outline" size={15} color="#2F5D50" />
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -280,7 +219,7 @@ const PigPenCard: React.FC<PigPenCardProps> = ({
           activeOpacity={0.8}
           disabled={isDeleting}
         >
-          <Ionicons name="trash-outline" size={14} color="#D96C8D" />
+          <Ionicons name="trash-outline" size={15} color="#E53935" />
           <Text style={styles.deleteButtonText}>
             {isDeleting ? 'Deleting...' : 'Delete'}
           </Text>
@@ -291,7 +230,7 @@ const PigPenCard: React.FC<PigPenCardProps> = ({
           activeOpacity={0.7}
         >
           <Text style={styles.viewDetailsText}>View Details</Text>
-          <Ionicons name="chevron-forward" size={13} color="#D96C8D" />
+          <Ionicons name="chevron-forward" size={14} color="#2F5D50" />
         </TouchableOpacity>
       </View>
     </View>
@@ -324,10 +263,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   penName: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.3,
   },
   deviceCodeRow: {
@@ -337,9 +276,9 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   deviceCodeText: {
-    fontSize: 10.5,
-    color: '#A0B5AD',
-    fontFamily: 'Inter',
+    fontSize: 13,
+    color: '#5F6D69',
+    fontFamily: 'Arial',
     fontWeight: '500',
   },
   categoryBadge: {
@@ -348,9 +287,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
   },
   categoryText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   keyInfoRow: {
@@ -359,7 +298,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F8F9',
     borderRadius: 16,
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   keyInfoItem: {
     flex: 1,
@@ -367,27 +306,27 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   keyInfoValue: {
-    fontSize: 22,
+    fontSize: 25,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.5,
   },
   keyInfoLabel: {
-    fontSize: 11,
-    color: '#A0B5AD',
+    fontSize: 13,
+    color: '#5F6D69',
     fontWeight: '500',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   keyInfoDivider: {
     width: 1,
     height: 32,
     backgroundColor: '#E2EDEA',
+    marginHorizontal: 4,
   },
 
   envRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 6,
   },
   envCard: {
@@ -402,23 +341,23 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   envIconWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 27,
+    height: 27,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
   },
   envValue: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   envLabel: {
-    fontSize: 10,
-    color: '#A0B5AD',
-    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#5F6D69',
+    fontFamily: 'Arial',
   },
   feedMiniBar: {
     width: '70%',
@@ -432,95 +371,69 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 2,
   },
-  // Full-width accordion for the Feed Containers section. Styled after
-  // iOS Settings grouped cards: a soft rounded container, a tappable
-  // header row, and an inset body that separates each row with a hairline
-  // divider instead of individual bordered chips.
-  accordion: {
-    backgroundColor: '#F7F8F9',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  accordionHeader: {
+
+  /* Feed label + small chevron, tappable to open the container selector
+     modal — same "Feed" label as before, just now interactive. */
+  feedLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    gap: 4,
   },
-  accordionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  accordionIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
+
+  /* Container selector dropdown modal — visual pattern matches the
+     Environment screen's Select Pen dropdown (overlay + white rounded
+     menu + title + selectable options + checkmark). */
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
-    backgroundColor: '#FFF4E0',
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
-  accordionTitle: {
+  menu: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '100%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  menuTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1A2D27',
-    fontFamily: 'Inter',
-  },
-  accordionBody: {
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    gap: 12,
-  },
-  containerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 12,
-  },
-  containerRowDivider: {
+    color: '#5F6D69',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    fontFamily: 'Arial',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEB',
-    paddingBottom: 12,
+    borderBottomColor: '#EEF1F0',
   },
-  containerIconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  containerBarBlock: {
-    flex: 1,
-    gap: 5,
-  },
-  containerLabelRow: {
+  menuOption: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF1F0',
   },
-  containerLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#5B6E67',
-    fontFamily: 'Inter',
-  },
-  containerPercent: {
-    fontSize: 11,
-    fontWeight: '800',
+  menuOptionText: {
+    fontSize: 18,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
+    fontWeight: '500',
   },
-  containerBarTrack: {
-    width: '100%',
-    height: 5,
-    backgroundColor: '#E2EDEA',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  containerBarFill: {
-    height: '100%',
-    borderRadius: 3,
+  menuOptionValueText: {
+    fontSize: 15,
+    color: '#5F6D69',
+    fontFamily: 'Arial',
+    fontWeight: '600',
   },
 
   footerRow: {
@@ -541,30 +454,30 @@ const styles = StyleSheet.create({
     borderColor: '#DCEAE5',
   },
   editButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#2F5D50',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#FCF0F3',
+    backgroundColor: '#FFF0F0',
     borderRadius: 12,
     paddingVertical: 9,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#F6DCE3',
+    borderColor: '#FFD6D6',
   },
   deleteButtonDisabled: {
     opacity: 0.5,
   },
   deleteButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#D96C8D',
-    fontFamily: 'Inter',
+    color: '#E53935',
+    fontFamily: 'Arial',
   },
   viewDetailsButton: {
     marginLeft: 'auto',
@@ -575,10 +488,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   viewDetailsText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#D96C8D',
-    fontFamily: 'Inter',
+    color: '#2F5D50',
+    fontFamily: 'Arial',
   },
 });
 

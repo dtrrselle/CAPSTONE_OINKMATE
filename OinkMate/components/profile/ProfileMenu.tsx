@@ -126,13 +126,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
     fontFamily: 'Inter',
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#8A9994',
     fontFamily: 'Inter',
     fontWeight: '500',

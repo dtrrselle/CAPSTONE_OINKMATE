@@ -33,7 +33,7 @@ const DeleteScheduleModal: React.FC<DeleteScheduleModalProps> = ({
         <Pressable style={styles.modal} onPress={() => {}}>
           {/* Icon */}
           <View style={styles.iconWrap}>
-            <Ionicons name="trash-outline" size={28} color="#D96C8D" />
+            <Ionicons name="trash-outline" size={30} color="#E23744" />
           </View>
 
           {/* Text */}
@@ -50,7 +50,7 @@ const DeleteScheduleModal: React.FC<DeleteScheduleModalProps> = ({
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteButton} onPress={onConfirm} activeOpacity={0.8}>
-              <Ionicons name="trash-outline" size={15} color="#FFFFFF" />
+              <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -87,11 +87,11 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FCF0F3',
+    backgroundColor: '#FDECEC',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#F6DCE3',
+    borderColor: '#F8D3D3',
   },
 
   /* Text */
@@ -100,18 +100,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
 
   /* Actions */
@@ -131,10 +131,10 @@ const styles = StyleSheet.create({
     borderColor: '#E2EDEA',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   deleteButton: {
     flex: 1,
@@ -144,18 +144,18 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#D96C8D',
-    shadowColor: '#D96C8D',
+    backgroundColor: '#E23744',
+    shadowColor: '#E23744',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   deleteButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 });
 

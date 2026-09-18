@@ -19,8 +19,8 @@ const ScheduleTypeTabs: React.FC<ScheduleTypeTabsProps> = ({ selectedTab, onChan
       >
         <Ionicons
           name="restaurant-outline"
-          size={16}
-          color={selectedTab === 'feeding' ? '#FFFFFF' : '#6B8A82'}
+          size={18}
+          color={selectedTab === 'feeding' ? '#FFFFFF' : '#2F5D50'}
         />
         <Text style={[styles.tabText, selectedTab === 'feeding' && styles.tabTextSelected]}>
           Feeding
@@ -34,8 +34,8 @@ const ScheduleTypeTabs: React.FC<ScheduleTypeTabsProps> = ({ selectedTab, onChan
       >
         <Ionicons
           name="water-outline"
-          size={16}
-          color={selectedTab === 'sanitation' ? '#FFFFFF' : '#6B8A82'}
+          size={18}
+          color={selectedTab === 'sanitation' ? '#FFFFFF' : '#2F5D50'}
         />
         <Text style={[styles.tabText, selectedTab === 'sanitation' && styles.tabTextSelected]}>
           Sanitation
@@ -59,8 +59,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 7,
+    paddingVertical: 11,
     borderRadius: 14,
   },
   tabSelected: {
@@ -72,10 +72,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#6B8A82',
-    fontFamily: 'Inter',
+    color: '#4A5C57',
+    fontFamily: 'Arial',
   },
   tabTextSelected: {
     color: '#FFFFFF',

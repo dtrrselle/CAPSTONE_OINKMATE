@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2F5D50',
     borderRadius: 18,
     paddingVertical: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     shadowColor: '#2F5D50',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -89,9 +89,9 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   titleBlock: {
@@ -100,17 +100,17 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 29,
     fontWeight: '800',
     color: '#1A2D27',
     letterSpacing: -0.4,
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 });
 

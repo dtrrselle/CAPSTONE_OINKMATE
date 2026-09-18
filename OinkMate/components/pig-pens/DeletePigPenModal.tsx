@@ -41,7 +41,7 @@ const DeletePigPenModal: React.FC<DeletePigPenModalProps> = ({
             <Ionicons
               name="trash-outline"
               size={28}
-              color="#D96C8D"
+              color="#E53935"
             />
           </View>
 
@@ -76,7 +76,7 @@ const DeletePigPenModal: React.FC<DeletePigPenModalProps> = ({
               ) : (
                 <Ionicons
                   name="trash-outline"
-                  size={15}
+                  size={16}
                   color="#FFFFFF"
                 />
               )}
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FCF0F3',
+    backgroundColor: '#FFF0F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -124,16 +124,18 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
     color: '#1A2D27',
+    fontFamily: 'Arial',
   },
 
   subtitle: {
-    fontSize: 13,
+    fontSize: 16,
     textAlign: 'center',
-    color: '#8A9994',
-    lineHeight: 20,
+    color: '#5F6D69',
+    fontFamily: 'Arial',
+    lineHeight: 22,
   },
 
   actions: {
@@ -159,7 +161,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#D96C8D',
+    backgroundColor: '#E53935',
   },
 
   disabledButton: {
@@ -169,11 +171,15 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#4A5C57',
     fontWeight: '700',
+    fontSize: 16,
+    fontFamily: 'Arial',
   },
 
   deleteButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
+    fontSize: 16,
+    fontFamily: 'Arial',
   },
 });
 

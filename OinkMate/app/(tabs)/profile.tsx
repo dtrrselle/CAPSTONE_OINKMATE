@@ -9,7 +9,7 @@ import ProfileMenu from '../../components/profile/ProfileMenu';
 import LogoutButton from '../../components/profile/LogoutButton';
 
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
 
 interface FarmerUser {
   farmer_id?: number;

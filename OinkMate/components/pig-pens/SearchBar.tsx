@@ -28,11 +28,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <View style={styles.container}>
-      <Ionicons name="search-outline" size={19} color="#8A9994" />
+      <Ionicons name="search-outline" size={20} color="#2F5D50" />
       <TextInput
         style={styles.input}
         placeholder={placeholder}
-        placeholderTextColor="#A0B5AD"
+        placeholderTextColor="#8A9994"
         value={text}
         onChangeText={handleChange}
         returnKeyType="search"
@@ -45,7 +45,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Filter"
         >
-          <Ionicons name="options-outline" size={18} color="#2F5D50" />
+          <Ionicons name="options-outline" size={19} color="#2F5D50" />
         </TouchableOpacity>
       )}
     </View>
@@ -72,9 +72,9 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     paddingVertical: 0,
   },
   filterButton: {

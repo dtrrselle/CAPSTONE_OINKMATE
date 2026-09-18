@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     borderColor: '#F8D7D7',
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#E53935',
     fontFamily: 'Inter',
@@ -167,13 +167,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A2D27',
     fontFamily: 'Inter',
   },
   modalMessage: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#8A9994',
     fontFamily: 'Inter',
     fontWeight: '500',
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     borderColor: '#DCEAE5',
   },
   cancelButtonText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: '#2F5D50',
     fontFamily: 'Inter',
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2F5D50',
   },
   confirmButtonText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: 'Inter',
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   loadingText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     color: '#2F5D50',
     fontFamily: 'Inter',

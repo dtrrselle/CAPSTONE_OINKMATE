@@ -16,7 +16,17 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
+  'https://oinkmate.online/oinkmate-api';
+
+// Official Feed Type options — must match the names used by
+// feeding_reference.csv and expense_rates (category = 'Feed').
+const FEED_TYPE_OPTIONS = [
+  'Creep Feed',
+  'Pre-Starter Feed',
+  'Starter Feed',
+  'Grower Feed',
+  'Finisher Feed',
+];
 
 interface ErrorModalState {
   visible: boolean;
@@ -46,6 +56,11 @@ function getErrorModalConfig(code?: string, fallbackMessage?: string) {
         title: 'Pig Pen Not Found',
         message: 'We could not find this pig pen.',
       };
+    case 'INVALID_FEED_TYPE':
+      return {
+        title: 'Invalid Feed Type',
+        message: 'The selected feed type is not available.',
+      };
     default:
       return {
         title: 'Update Failed',
@@ -70,6 +85,11 @@ export default function EditPigPen() {
   // (feeding_helper.php) from feeding_reference.csv based on current age.
   // It is never entered or edited manually.
   const [growthStage, setGrowthStage] = useState('');
+  // Actual Feed Type — the Feed Type actually selected/used by the
+  // farmer for this pig pen. Separate from growthStage (system
+  // recommendation) above. Stored in pig_pen_records.feed_type.
+  const [actualFeedType, setActualFeedType] = useState('');
+  const [showFeedTypeOptions, setShowFeedTypeOptions] = useState(false);
   const [avgWeight, setAvgWeight] = useState('');
   // pig_age_at_registration is only ever entered when a pig pen is first
   // created — it's never edited here. We just hold onto the original
@@ -119,6 +139,7 @@ export default function EditPigPen() {
         setDescription(pen.description ?? '');
         setTotalPigs(pen.pig_count != null ? String(pen.pig_count) : '');
         setGrowthStage(pen.growthStage ?? '');
+        setActualFeedType(pen.actualFeedType ?? '');
         setAvgWeight(pen.avg_weight != null ? String(pen.avg_weight) : '');
         setPigAgeAtRegistration(
           pen.pig_age_at_registration != null ? Number(pen.pig_age_at_registration) : null
@@ -160,6 +181,15 @@ export default function EditPigPen() {
       return;
     }
 
+    if (!actualFeedType.trim()) {
+      setErrorModal({
+        visible: true,
+        title: 'Missing Information',
+        message: 'Please select an actual feed type before saving.',
+      });
+      return;
+    }
+
     setShowConfirmModal(true);
   };
 
@@ -182,6 +212,9 @@ export default function EditPigPen() {
           // Resent as-is (never edited by the farmer here) so the
           // backend can (re)compute Growth Stage correctly.
           pig_age_at_registration: pigAgeAtRegistration,
+          // Backend/database field is feed_type — this is the
+          // farmer-selected Actual Feed Type, separate from growthStage.
+          feed_type: actualFeedType,
         }),
       });
 
@@ -280,6 +313,60 @@ export default function EditPigPen() {
               Automatically computed based on the pigs' current age. This
               updates on its own and cannot be edited manually.
             </Text>
+          </View>
+
+          {/* Actual Feed Type — the Feed Type actually selected/used by
+              the farmer for this pig pen. Separate from Growth Stage
+              above. Stored in pig_pen_records.feed_type. */}
+          <View style={styles.card}>
+            <View style={styles.cardLabelRow}>
+              <Ionicons name="nutrition-outline" size={15} color="#2F5D50" />
+              <Text style={styles.cardLabel}>Actual Feed Type</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.dropdownInput}
+              activeOpacity={0.8}
+              onPress={() => setShowFeedTypeOptions((prev) => !prev)}
+            >
+              <Text
+                style={[
+                  styles.dropdownInputText,
+                  !actualFeedType && styles.dropdownPlaceholderText,
+                ]}
+              >
+                {actualFeedType || 'Select Feed Type'}
+              </Text>
+              <Ionicons
+                name={showFeedTypeOptions ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#2F5D50"
+              />
+            </TouchableOpacity>
+            {showFeedTypeOptions && (
+              <View style={styles.optionList}>
+                {FEED_TYPE_OPTIONS.map((option) => {
+                  const isSelected = option === actualFeedType;
+                  return (
+                    <TouchableOpacity
+                      key={option}
+                      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setActualFeedType(option);
+                        setShowFeedTypeOptions(false);
+                      }}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                        {option}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={16} color="#2F5D50" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           {/* Average Weight */}
@@ -467,10 +554,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: -0.2,
   },
   headerPlaceholder: {
@@ -514,10 +601,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   /* Text Input */
@@ -526,9 +613,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    fontSize: 13,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     borderWidth: 1,
     borderColor: '#E2EDEA',
   },
@@ -549,9 +636,9 @@ const styles = StyleSheet.create({
     borderColor: '#E2EDEA',
   },
   dropdownInputText: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   dropdownPlaceholderText: {
     color: '#B0C0BC',
@@ -584,10 +671,10 @@ const styles = StyleSheet.create({
     borderColor: '#2F5D50',
   },
   optionText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   optionTextSelected: {
     color: '#2F5D50',
@@ -596,9 +683,9 @@ const styles = StyleSheet.create({
 
   /* Helper Text */
   helperText: {
-    fontSize: 11,
+    fontSize: 14,
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     marginTop: -4,
   },
 
@@ -622,10 +709,10 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 
   bottomSpacer: {
@@ -666,16 +753,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF0F0',
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
   },
   modalMessage: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     textAlign: 'center',
     lineHeight: 19,
     marginBottom: 8,
@@ -696,10 +783,10 @@ const styles = StyleSheet.create({
     borderColor: '#DCEAE5',
   },
   modalCancelText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#4A5C57',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   modalConfirmButton: {
     flex: 1,
@@ -710,10 +797,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#2F5D50',
   },
   modalConfirmText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
   modalOkButton: {
     width: '100%',
@@ -725,9 +812,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   modalOkText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
 });

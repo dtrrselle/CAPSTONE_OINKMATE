@@ -4,546 +4,2548 @@ import {
   Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// NOTE: schedule.tsx defines its own API_BASE_URL (the ngrok tunnel host)
-// as a local constant, so it isn't importable from here without creating
-// a new shared config file, which is outside this task's allowed files.
-// Duplicated here so this endpoint hits the same backend — if you move
-// API_BASE_URL into a shared config later, point this at it too.
-const API_BASE_URL =
-  'https://unmotivated-marietta-unbuffered.ngrok-free.dev/oinkmate-api';
-const UPDATE_MANUAL_OVERRIDE_ENDPOINT = `${API_BASE_URL}/api/iot/manual/update_manual_override.php`;
-const GET_MANUAL_OVERRIDE_ENDPOINT = `${API_BASE_URL}/api/iot/manual/get_manual_override.php`;
+// --------------------------------------------------------------------------
+// API CONFIGURATION
+// --------------------------------------------------------------------------
 
-// Shape of each Pig Pen entry. Loaded by schedule.tsx (the page that owns
-// this data) and simply displayed/selected here — this component never
-// fetches Pig Pens itself, so there's only ever one request per page load.
+// Production backend.
+// Do NOT point this at an ngrok tunnel or another temporary/dev host.
+const API_BASE_URL =
+  'https://oinkmate.online/oinkmate-api';
+
+const UPDATE_MANUAL_OVERRIDE_ENDPOINT =
+  `${API_BASE_URL}/api/iot/manual/update_manual_override.php`;
+
+const GET_MANUAL_OVERRIDE_ENDPOINT =
+  `${API_BASE_URL}/api/iot/manual/get_manual_override.php`;
+
+const MANUAL_FEEDING_ENDPOINT =
+  `${API_BASE_URL}/api/iot/manual/manual_feeding.php`;
+
+const MANUAL_SANITATION_ENDPOINT =
+  `${API_BASE_URL}/api/iot/manual/manual_sanitation.php`;
+
+// --------------------------------------------------------------------------
+// TYPES
+// --------------------------------------------------------------------------
+
 export interface PigPenOption {
   pen_id: number;
   pen_name: string;
   device_code: string;
+  pig_count?: number | null;
 }
+
+// --------------------------------------------------------------------------
+// MANUAL FEEDING DETAILS FORM CONFIG (NEW - Phase 1: frontend only)
+// --------------------------------------------------------------------------
+//
+// These correspond to the existing feeding_reference.csv age brackets:
+//   0–28 days    -> Creep
+//   28–58 days   -> Pre-Starter
+//   58–70 days   -> Starter
+//   70–140 days  -> Grower
+//   140–196 days -> Finisher
+const FEED_TYPE_OPTIONS: string[] = [
+  'Creep',
+  'Pre-Starter',
+  'Starter',
+  'Grower',
+  'Finisher',
+];
 
 interface ManualOverrideControlsProps {
-  // Supplied by schedule.tsx after it loads the farmer's Pig Pens from
-  // the existing Pig Pen endpoint.
+  // Supplied by schedule.tsx after it loads the farmer's Pig Pens.
   pigPens: PigPenOption[];
+
   // True while schedule.tsx is still fetching the Pig Pen list.
   loadingPigPens?: boolean;
-  onOverrideChange?: (type: 'feeding' | 'sanitation', value: boolean) => void;
+
+  onOverrideChange?: (
+    type: 'feeding' | 'sanitation',
+    value: boolean
+  ) => void;
 }
 
-const ManualOverrideControls: React.FC<ManualOverrideControlsProps> = ({
+// --------------------------------------------------------------------------
+// COMPONENT
+// --------------------------------------------------------------------------
+
+const ManualOverrideControls: React.FC<
+  ManualOverrideControlsProps
+> = ({
   pigPens,
   loadingPigPens = false,
   onOverrideChange,
 }) => {
-  const [selectedPenId, setSelectedPenId] = useState<number | null>(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [showNoPenWarning, setShowNoPenWarning] = useState(false);
 
-  const [feedingOverride, setFeedingOverride] = useState(false);
-  const [sanitationOverride, setSanitationOverride] = useState(false);
-  const [feedingLoading, setFeedingLoading] = useState(false);
-  const [sanitationLoading, setSanitationLoading] = useState(false);
+  // ------------------------------------------------------------------------
+  // PIG PEN SELECTION
+  // ------------------------------------------------------------------------
 
-  // Keep the selection valid as the Pig Pen list loads/changes: default
-  // to the first pen once pens arrive, and fall back gracefully if the
-  // previously-selected pen ever disappears from the list.
+  const [selectedPenId, setSelectedPenId] =
+    useState<number | null>(null);
+
+  const [pickerVisible, setPickerVisible] =
+    useState(false);
+
+  const [showNoPenWarning, setShowNoPenWarning] =
+    useState(false);
+
+
+  // ------------------------------------------------------------------------
+  // MANUAL OVERRIDE STATES
+  // ------------------------------------------------------------------------
+
+  const [feedingOverride, setFeedingOverride] =
+    useState(false);
+
+  const [sanitationOverride, setSanitationOverride] =
+    useState(false);
+
+  const [feedingLoading, setFeedingLoading] =
+    useState(false);
+
+  const [sanitationLoading, setSanitationLoading] =
+    useState(false);
+
+
+  // ------------------------------------------------------------------------
+  // CONFIRMATION MODAL
+  // ------------------------------------------------------------------------
+
+  const [pendingOverride, setPendingOverride] =
+    useState<{
+      type: 'feeding' | 'sanitation';
+      nextValue: boolean;
+    } | null>(null);
+
+  const [confirmSubmitting, setConfirmSubmitting] =
+    useState(false);
+
+  const [confirmError, setConfirmError] =
+    useState<string | null>(null);
+
+
+  // ------------------------------------------------------------------------
+  // MANUAL FEEDING DETAILS FORM (NEW - Phase 1: frontend only)
+  //
+  // Pressing the Feeding toggle no longer triggers manual_feeding=1
+  // directly. It now opens this form first. Confirm Feeding only stores
+  // the selected values locally — no request is sent to the backend yet.
+  // ------------------------------------------------------------------------
+
+  const [feedingDetailsVisible, setFeedingDetailsVisible] =
+    useState(false);
+
+  const [feedTypeSelected, setFeedTypeSelected] =
+    useState<string | null>(null);
+
+  const [feedTypePickerVisible, setFeedTypePickerVisible] =
+    useState(false);
+
+  const [feedAmountKg, setFeedAmountKg] =
+    useState('');
+
+  const [feedingFormError, setFeedingFormError] =
+    useState<string | null>(null);
+
+  // Values captured when the farmer presses "Confirm Feeding".
+  // Phase 2 (backend) will use this to create the feeding log and trigger
+  // the existing manual feeding mechanism.
+  const [preparedManualFeeding, setPreparedManualFeeding] =
+    useState<{
+      pen_id: number;
+      device_code: string;
+      pig_count: number | null;
+      feed_type: string;
+      feed_amount_kg: number;
+    } | null>(null);
+
+  // Dedicated loading flag for the Manual Feeding Details "Confirm Feeding"
+  // request ONLY. Does not reuse/affect confirmSubmitting (sanitation /
+  // generic override confirm modal).
+  const [feedingDetailsSubmitting, setFeedingDetailsSubmitting] =
+    useState(false);
+
+
+  // ------------------------------------------------------------------------
+  // MANUAL SANITATION DETAILS FORM (NEW)
+  //
+  // Pressing the Sanitation toggle (OFF -> ON) no longer opens the generic
+  // "Confirm Manual Override" modal. It now opens this form first, which
+  // calls manual_sanitation.php directly on Confirm Sanitation.
+  // ------------------------------------------------------------------------
+
+  const [sanitationDetailsVisible, setSanitationDetailsVisible] =
+    useState(false);
+
+  const [sanitationDurationSeconds, setSanitationDurationSeconds] =
+    useState('');
+
+  const [sanitationFormError, setSanitationFormError] =
+    useState<string | null>(null);
+
+  // Dedicated loading flag for the Manual Sanitation Details
+  // "Confirm Sanitation" request ONLY.
+  const [sanitationDetailsSubmitting, setSanitationDetailsSubmitting] =
+    useState(false);
+
+
+  // ------------------------------------------------------------------------
+  // CYCLE-IN-PROGRESS MODAL
+  // ------------------------------------------------------------------------
+
+  const [showCycleInProgress, setShowCycleInProgress] =
+    useState(false);
+
+  const [cycleInProgressType, setCycleInProgressType] =
+    useState<'feeding' | 'sanitation' | null>(null);
+
+
+  // ------------------------------------------------------------------------
+  // KEEP SELECTED PIG PEN VALID
+  // ------------------------------------------------------------------------
+
   useEffect(() => {
     setSelectedPenId((prev) => {
-      if (prev !== null && pigPens.some((pen) => pen.pen_id === prev)) {
+      if (
+        prev !== null &&
+        pigPens.some(
+          (pen) => pen.pen_id === prev
+        )
+      ) {
         return prev;
       }
-      return pigPens.length > 0 ? pigPens[0].pen_id : null;
+
+      return null;
     });
   }, [pigPens]);
 
-  const selectedPen = pigPens.find((pen) => pen.pen_id === selectedPenId) ?? null;
 
-  // Switching the target Pig Pen targets a different Raspberry Pi, whose
-  // actual override state we don't know yet, so reset the toggles to a
-  // safe default rather than showing stale state from the previous pen.
+  const selectedPen =
+    pigPens.find(
+      (pen) => pen.pen_id === selectedPenId
+    ) ?? null;
+
+
+  // ------------------------------------------------------------------------
+  // RESET LOCAL OVERRIDE STATE WHEN CHANGING PIG PEN
+  // ------------------------------------------------------------------------
+
   useEffect(() => {
+
     setFeedingOverride(false);
     setSanitationOverride(false);
+
     feedingOverrideRef.current = false;
     sanitationOverrideRef.current = false;
+
+    setConfirmError(null);
+
+    setPendingOverride(null);
+
+    setShowCycleInProgress(false);
+    setCycleInProgressType(null);
+
+    // Reset the Manual Feeding Details form (NEW - Phase 1).
+    setFeedingDetailsVisible(false);
+    setFeedTypeSelected(null);
+    setFeedTypePickerVisible(false);
+    setFeedAmountKg('');
+    setFeedingFormError(null);
+    setFeedingDetailsSubmitting(false);
+
+    // Reset the Manual Sanitation Details form (NEW).
+    setSanitationDetailsVisible(false);
+    setSanitationDurationSeconds('');
+    setSanitationFormError(null);
+    setSanitationDetailsSubmitting(false);
+
   }, [selectedPenId]);
 
-  // Keep refs in sync with the loading flags so the poller (whose closure
-  // is only recreated when selectedPen changes) can always check the
-  // latest value without needing to be re-created on every toggle press.
-  const feedingLoadingRef = useRef(feedingLoading);
-  const sanitationLoadingRef = useRef(sanitationLoading);
+
+  // ------------------------------------------------------------------------
+  // LOADING REFS
+  // ------------------------------------------------------------------------
+
+  const feedingLoadingRef =
+    useRef(feedingLoading);
+
+  const sanitationLoadingRef =
+    useRef(sanitationLoading);
+
+
   useEffect(() => {
-    feedingLoadingRef.current = feedingLoading;
+    feedingLoadingRef.current =
+      feedingLoading;
   }, [feedingLoading]);
+
+
   useEffect(() => {
-    sanitationLoadingRef.current = sanitationLoading;
+    sanitationLoadingRef.current =
+      sanitationLoading;
   }, [sanitationLoading]);
 
-  // DEBUG: guards for the poller.
-  // - isMountedRef: so a response that resolves after unmount never
-  //   calls setState on an unmounted component.
-  // - isFetchingStatusRef: so a slow/hanging request can't overlap with
-  //   the next 5s tick and stack up parallel connections to the tunnel.
-  const isMountedRef = useRef(true);
+
+  // ------------------------------------------------------------------------
+  // COMPONENT MOUNT / UNMOUNT GUARD
+  // ------------------------------------------------------------------------
+
+  const isMountedRef =
+    useRef(true);
+
+
   useEffect(() => {
+
     isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
     };
+
   }, []);
-  const isFetchingStatusRef = useRef(false);
 
-  // Concurrency guards between polling (GET) and manual updates (POST):
-  // - feedingUpdateInProgressRef / sanitationUpdateInProgressRef: stop the
-  //   *same* toggle from firing a second overlapping update if a tap slips
-  //   through before its own loading state disables the control.
-  // - activeUpdateCountRef: how many manual update requests (feeding
-  //   and/or sanitation) are currently in flight. The poller checks this
-  //   and skips its tick entirely while it's > 0, so a GET never overlaps
-  //   a POST on the same tunnel — that overlap was the source of the
-  //   intermittent console errors when both toggles were pressed close
-  //   together.
-  const feedingUpdateInProgressRef = useRef(false);
-  const sanitationUpdateInProgressRef = useRef(false);
-  const activeUpdateCountRef = useRef(0);
 
-  // Mirror the toggle values into refs, updated synchronously at the same
-  // moment as the optimistic setState call (not via a useEffect, which
-  // would still lag a render behind). This is what handleManualOverride
-  // reads from when it needs "the other" toggle's latest value — reading
-  // the plain state variable instead can capture a stale snapshot if
-  // feeding and sanitation are toggled almost simultaneously, since each
-  // call's closure freezes state as of when it started.
-  const feedingOverrideRef = useRef(feedingOverride);
-  const sanitationOverrideRef = useRef(sanitationOverride);
+  // ------------------------------------------------------------------------
+  // POLLING GUARD
+  // ------------------------------------------------------------------------
 
-  // READ ONLY: fetches the backend's current manual_feeding /
-  // manual_sanitation values for the selected Pig Pen and mirrors them
-  // into local UI state. Never calls update_manual_override.php.
-  const loadManualOverrideStatus = useCallback(async () => {
-    // DEBUG: confirm both endpoints and the current pen before firing.
-    console.log('GET URL:', GET_MANUAL_OVERRIDE_ENDPOINT);
-    console.log('UPDATE URL:', UPDATE_MANUAL_OVERRIDE_ENDPOINT);
-    console.log('Selected Pen:', selectedPen);
-    console.log('Device Code:', selectedPen?.device_code);
+  const isFetchingStatusRef =
+    useRef(false);
 
-    if (!selectedPen || !selectedPen.device_code) {
-      console.log('loadManualOverrideStatus: no selected pen / device_code yet, skipping.');
-      return;
-    }
 
-    // Never let a poll (GET) overlap a manual update (POST) — this is
-    // what was intermittently erroring when feeding and sanitation were
-    // pressed close together, since both would race a poll tick on the
-    // same ngrok tunnel.
-    if (activeUpdateCountRef.current > 0) {
-      console.log('[poll] skipped — a manual update is in progress', {
-        activeUpdates: activeUpdateCountRef.current,
-      });
-      return;
-    }
+  // ------------------------------------------------------------------------
+  // UPDATE CONCURRENCY GUARDS
+  // ------------------------------------------------------------------------
 
-    // Don't let a slow/hanging request overlap with the next 5s tick —
-    // that's what was stacking up parallel connections to the tunnel.
-    if (isFetchingStatusRef.current) {
-      console.log('loadManualOverrideStatus: previous request still in flight, skipping this tick.');
-      return;
-    }
-    isFetchingStatusRef.current = true;
+  const feedingUpdateInProgressRef =
+    useRef(false);
 
-    try {
-      const deviceCode = selectedPen.device_code;
+  const sanitationUpdateInProgressRef =
+    useRef(false);
 
-      // get_manual_override.php was confirmed (via a direct browser hit)
-      // to respond correctly to ?device_code=... on the query string.
-      // The JSON body is kept alongside it so this also keeps working
-      // if the script ever starts reading php://input as well — but the
-      // query string is what actually carries device_code today.
-      const requestUrl = `${GET_MANUAL_OVERRIDE_ENDPOINT}?device_code=${encodeURIComponent(deviceCode)}`;
+  const activeUpdateCountRef =
+    useRef(0);
 
-      const response = await fetch(requestUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_code: deviceCode }),
-      });
 
-      // DEBUG: inspect the raw response before trusting it as JSON.
-      console.log('HTTP Status:', response.status);
-      const raw = await response.text();
-      console.log('Raw Response:', raw);
+  // ------------------------------------------------------------------------
+  // SYNCHRONOUS OVERRIDE REFS
+  // ------------------------------------------------------------------------
 
-      let data: any = null;
-      try {
-        data = raw ? JSON.parse(raw) : null;
-      } catch (parseError) {
-        console.error('[poll] response was not valid JSON', {
-          source: 'poll',
-          endpoint: requestUrl,
-          status: response.status,
-          raw,
-          parseError,
-        });
-      }
+  const feedingOverrideRef =
+    useRef(feedingOverride);
 
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || 'Failed to load manual override status.');
-      }
+  const sanitationOverrideRef =
+    useRef(sanitationOverride);
 
-      if (!isMountedRef.current) {
+
+  // ------------------------------------------------------------------------
+  // FETCH MANUAL OVERRIDE STATUS
+  // ------------------------------------------------------------------------
+
+  const loadManualOverrideStatus =
+    useCallback(async () => {
+
+      console.log(
+        'GET URL:',
+        GET_MANUAL_OVERRIDE_ENDPOINT
+      );
+
+      console.log(
+        'UPDATE URL:',
+        UPDATE_MANUAL_OVERRIDE_ENDPOINT
+      );
+
+      console.log(
+        'Selected Pen:',
+        selectedPen
+      );
+
+      console.log(
+        'Device Code:',
+        selectedPen?.device_code
+      );
+
+
+      if (
+        !selectedPen ||
+        !selectedPen.device_code
+      ) {
+
+        console.log(
+          'loadManualOverrideStatus: no selected pen / device_code yet, skipping.'
+        );
+
         return;
       }
 
-      // Don't stomp on an in-flight optimistic toggle update — let
-      // handleManualOverride's own request settle that toggle first.
-      if (!feedingLoadingRef.current) {
-        const confirmedFeeding = Boolean(data.manual_feeding);
-        setFeedingOverride(confirmedFeeding);
-        feedingOverrideRef.current = confirmedFeeding;
-      }
-      if (!sanitationLoadingRef.current) {
-        const confirmedSanitation = Boolean(data.manual_sanitation);
-        setSanitationOverride(confirmedSanitation);
-        sanitationOverrideRef.current = confirmedSanitation;
-      }
-    } catch (error) {
-      // Keep whatever the UI currently shows; don't reset toggles on
-      // a failed poll.
-      console.error('[poll] failed to load manual override status', {
-        source: 'poll',
-        endpoint: GET_MANUAL_OVERRIDE_ENDPOINT,
-        device_code: selectedPen?.device_code,
-        error,
-      });
-    } finally {
-      isFetchingStatusRef.current = false;
-    }
-  }, [selectedPen?.device_code]);
 
-  // Load immediately when the selected Pig Pen changes, then keep polling
-  // the backend every 5 seconds while this control stays mounted so the
-  // toggles reflect the Raspberry Pi's post-cycle reset automatically.
+      // Don't poll while an update request is running.
+      if (
+        activeUpdateCountRef.current > 0
+      ) {
+
+        console.log(
+          '[poll] skipped — a manual update is in progress',
+          {
+            activeUpdates:
+              activeUpdateCountRef.current,
+          }
+        );
+
+        return;
+      }
+
+
+      // Prevent overlapping GET requests.
+      if (
+        isFetchingStatusRef.current
+      ) {
+
+        console.log(
+          'loadManualOverrideStatus: previous request still in flight, skipping this tick.'
+        );
+
+        return;
+      }
+
+
+      isFetchingStatusRef.current = true;
+
+
+      try {
+
+        const deviceCode =
+          selectedPen.device_code;
+
+
+        const requestUrl =
+          `${GET_MANUAL_OVERRIDE_ENDPOINT}?device_code=${encodeURIComponent(
+            deviceCode
+          )}`;
+
+
+        const response =
+          await fetch(
+            requestUrl,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body: JSON.stringify({
+                device_code:
+                  deviceCode,
+              }),
+            }
+          );
+
+
+        console.log(
+          'HTTP Status:',
+          response.status
+        );
+
+
+        const raw =
+          await response.text();
+
+
+        console.log(
+          'Raw Response:',
+          raw
+        );
+
+
+        let data: any = null;
+
+
+        try {
+
+          data =
+            raw
+              ? JSON.parse(raw)
+              : null;
+
+        } catch (parseError) {
+
+          console.error(
+            '[poll] response was not valid JSON',
+            {
+              source: 'poll',
+              endpoint:
+                requestUrl,
+              status:
+                response.status,
+              raw,
+              parseError,
+            }
+          );
+
+        }
+
+
+        if (
+          !response.ok ||
+          !data?.success
+        ) {
+
+          throw new Error(
+            data?.message ||
+            'Failed to load manual override status.'
+          );
+
+        }
+
+
+        if (
+          !isMountedRef.current
+        ) {
+          return;
+        }
+
+
+        // ----------------------------------------------------------------
+        // IMPORTANT:
+        //
+        // The Pico resets the backend flag to 0 ONLY AFTER the physical
+        // cycle has completed.
+        //
+        // Therefore, when the backend is still 1, the toggle remains ON.
+        // ----------------------------------------------------------------
+
+        if (
+          !feedingLoadingRef.current
+        ) {
+
+          const confirmedFeeding =
+            Boolean(
+              data.manual_feeding
+            );
+
+          setFeedingOverride(
+            confirmedFeeding
+          );
+
+          feedingOverrideRef.current =
+            confirmedFeeding;
+        }
+
+
+        if (
+          !sanitationLoadingRef.current
+        ) {
+
+          const confirmedSanitation =
+            Boolean(
+              data.manual_sanitation
+            );
+
+          setSanitationOverride(
+            confirmedSanitation
+          );
+
+          sanitationOverrideRef.current =
+            confirmedSanitation;
+        }
+
+
+      } catch (error) {
+
+        // Keep the current UI state.
+        // A failed poll must NOT suddenly turn the toggle OFF.
+
+        console.error(
+          '[poll] failed to load manual override status',
+          {
+            source: 'poll',
+            endpoint:
+              GET_MANUAL_OVERRIDE_ENDPOINT,
+            device_code:
+              selectedPen?.device_code,
+            error,
+          }
+        );
+
+      } finally {
+
+        isFetchingStatusRef.current =
+          false;
+
+      }
+
+    }, [selectedPen?.device_code]);
+
+
+  // ------------------------------------------------------------------------
+  // INITIAL LOAD + 5-SECOND POLLING
+  // ------------------------------------------------------------------------
+
   useEffect(() => {
+
     if (!selectedPen) {
       return;
     }
+
 
     loadManualOverrideStatus();
 
-    const intervalId = setInterval(() => {
-      loadManualOverrideStatus();
-    }, 5000);
 
-    return () => clearInterval(intervalId);
-  }, [selectedPen?.device_code, loadManualOverrideStatus]);
+    const intervalId =
+      setInterval(() => {
 
-  const noPigPensAvailable = !loadingPigPens && pigPens.length === 0;
-  const controlsDisabled = loadingPigPens || noPigPensAvailable || !selectedPen;
+        loadManualOverrideStatus();
 
-  const handleManualOverride = async (type: 'feeding' | 'sanitation', nextValue: boolean) => {
+      }, 5000);
+
+
+    return () =>
+      clearInterval(intervalId);
+
+  }, [
+    selectedPen?.device_code,
+    loadManualOverrideStatus,
+  ]);
+
+
+  // ------------------------------------------------------------------------
+  // UI DISABLED CONDITIONS
+  // ------------------------------------------------------------------------
+
+  const noPigPensAvailable =
+    !loadingPigPens &&
+    pigPens.length === 0;
+
+
+  const controlsDisabled =
+    loadingPigPens ||
+    noPigPensAvailable ||
+    !selectedPen;
+
+
+  // ------------------------------------------------------------------------
+  // MANUAL OVERRIDE UPDATE
+  // ------------------------------------------------------------------------
+
+  const handleManualOverride =
+    async (
+      type:
+        | 'feeding'
+        | 'sanitation',
+      nextValue: boolean
+    ): Promise<{
+      success: boolean;
+      message?: string;
+    }> => {
+
+      if (!selectedPen) {
+
+        setShowNoPenWarning(true);
+
+        return {
+          success: false,
+          message:
+            'Please choose a Pig Pen first.',
+        };
+
+      }
+
+
+      setShowNoPenWarning(false);
+
+
+      // --------------------------------------------------------------------
+      // DEFENSE AGAINST DUPLICATE REQUEST
+      // --------------------------------------------------------------------
+
+      const inProgressRef =
+        type === 'feeding'
+          ? feedingUpdateInProgressRef
+          : sanitationUpdateInProgressRef;
+
+
+      if (
+        inProgressRef.current
+      ) {
+
+        console.log(
+          `[manual-update] ${type} update already in progress, ignoring duplicate press.`
+        );
+
+        return {
+          success: false,
+          message:
+            'An update is already in progress.',
+        };
+
+      }
+
+
+      inProgressRef.current =
+        true;
+
+      activeUpdateCountRef.current +=
+        1;
+
+
+      const deviceCode =
+        selectedPen.device_code;
+
+
+      const previousValue =
+        type === 'feeding'
+          ? feedingOverride
+          : sanitationOverride;
+
+
+      // --------------------------------------------------------------------
+      // OPTIMISTIC UI UPDATE
+      // --------------------------------------------------------------------
+
+      if (
+        type === 'feeding'
+      ) {
+
+        setFeedingOverride(
+          nextValue
+        );
+
+        feedingOverrideRef.current =
+          nextValue;
+
+        setFeedingLoading(true);
+
+      } else {
+
+        setSanitationOverride(
+          nextValue
+        );
+
+        sanitationOverrideRef.current =
+          nextValue;
+
+        setSanitationLoading(true);
+
+      }
+
+
+      try {
+
+        // ------------------------------------------------------------------
+        // BACKEND PAYLOAD
+        // ------------------------------------------------------------------
+
+        const payload = {
+
+          device_code:
+            deviceCode,
+
+          manual_feeding:
+            Number(
+              type === 'feeding'
+                ? nextValue
+                : feedingOverrideRef.current
+            ),
+
+          manual_sanitation:
+            Number(
+              type === 'sanitation'
+                ? nextValue
+                : sanitationOverrideRef.current
+            ),
+
+        };
+
+
+        const response =
+          await fetch(
+            UPDATE_MANUAL_OVERRIDE_ENDPOINT,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body:
+                JSON.stringify(
+                  payload
+                ),
+            }
+          );
+
+
+        console.log(
+          `HTTP Status (${type} update):`,
+          response.status
+        );
+
+
+        const raw =
+          await response.text();
+
+
+        console.log(
+          `Raw Response (${type} update):`,
+          raw
+        );
+
+
+        let data: any = null;
+
+
+        try {
+
+          data =
+            raw
+              ? JSON.parse(raw)
+              : null;
+
+        } catch (parseError) {
+
+          console.error(
+            '[manual-update] response was not valid JSON',
+            {
+              source:
+                'manual-update',
+              type,
+              endpoint:
+                UPDATE_MANUAL_OVERRIDE_ENDPOINT,
+              status:
+                response.status,
+              raw,
+              parseError,
+            }
+          );
+
+        }
+
+
+        if (
+          !response.ok ||
+          !data?.success
+        ) {
+
+          throw new Error(
+            data?.message ||
+            'Failed to update manual override.'
+          );
+
+        }
+
+
+        // ------------------------------------------------------------------
+        // SUCCESS
+        // ------------------------------------------------------------------
+
+        onOverrideChange?.(
+          type,
+          nextValue
+        );
+
+
+        return {
+          success: true,
+        };
+
+
+      } catch (error) {
+
+        console.error(
+          '[manual-update] failed',
+          {
+            source:
+              'manual-update',
+            type,
+            endpoint:
+              UPDATE_MANUAL_OVERRIDE_ENDPOINT,
+            device_code:
+              deviceCode,
+            attemptedValue:
+              nextValue,
+            error,
+          }
+        );
+
+
+        // Restore previous UI state.
+        if (
+          type === 'feeding'
+        ) {
+
+          setFeedingOverride(
+            previousValue
+          );
+
+          feedingOverrideRef.current =
+            previousValue;
+
+        } else {
+
+          setSanitationOverride(
+            previousValue
+          );
+
+          sanitationOverrideRef.current =
+            previousValue;
+
+        }
+
+
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Failed to update manual override.',
+        };
+
+
+      } finally {
+
+        if (
+          type === 'feeding'
+        ) {
+
+          setFeedingLoading(
+            false
+          );
+
+        } else {
+
+          setSanitationLoading(
+            false
+          );
+
+        }
+
+
+        inProgressRef.current =
+          false;
+
+
+        activeUpdateCountRef.current =
+          Math.max(
+            0,
+            activeUpdateCountRef.current - 1
+          );
+
+      }
+
+    };
+
+
+  // ------------------------------------------------------------------------
+  // TOGGLE PRESS HANDLERS
+  // ------------------------------------------------------------------------
+
+  const handleFeedingTogglePress =
+    () => {
+
+      // --------------------------------------------------------------
+      // IMPORTANT:
+      //
+      // If feeding is already ON, the user is trying to turn it OFF.
+      //
+      // DO NOT send an OFF command.
+      //
+      // Instead, explain that the cycle must finish.
+      // --------------------------------------------------------------
+
+      if (
+        feedingOverride
+      ) {
+
+        setCycleInProgressType(
+          'feeding'
+        );
+
+        setShowCycleInProgress(
+          true
+        );
+
+        return;
+      }
+
+
+      // --------------------------------------------------------------
+      // NEW (Phase 1): Instead of immediately arming a manual_feeding=1
+      // trigger, open the Manual Feeding Details form. The existing
+      // manual_feeding trigger flow itself is untouched — it will be
+      // wired up to this form's "Confirm Feeding" button in Phase 2.
+      // --------------------------------------------------------------
+
+      setFeedTypeSelected(null);
+      setFeedAmountKg('');
+      setFeedingFormError(null);
+      setFeedingDetailsVisible(true);
+
+    };
+
+
+  const handleSanitationTogglePress =
+    () => {
+
+      // --------------------------------------------------------------
+      // Same behavior for sanitation.
+      //
+      // Once ON, it cannot be force-stopped.
+      // --------------------------------------------------------------
+
+      if (
+        sanitationOverride
+      ) {
+
+        setCycleInProgressType(
+          'sanitation'
+        );
+
+        setShowCycleInProgress(
+          true
+        );
+
+        return;
+      }
+
+
+      // --------------------------------------------------------------
+      // NEW: Instead of opening the old generic "Confirm Manual
+      // Override" modal, open the Manual Sanitation Details form.
+      // Confirm Sanitation (below) calls manual_sanitation.php
+      // directly — the generic handleManualOverride() path is no
+      // longer used to start a new manual sanitation cycle.
+      // --------------------------------------------------------------
+
+      setSanitationDurationSeconds('');
+      setSanitationFormError(null);
+      setSanitationDetailsVisible(true);
+
+    };
+
+
+  // ------------------------------------------------------------------------
+  // MANUAL FEEDING DETAILS FORM HANDLERS (NEW - Phase 1: frontend only)
+  // ------------------------------------------------------------------------
+
+  const closeFeedingDetailsForm = () => {
+
+    setFeedingDetailsVisible(false);
+    setFeedTypePickerVisible(false);
+    setFeedTypeSelected(null);
+    setFeedAmountKg('');
+    setFeedingFormError(null);
+
+  };
+
+
+  const handleConfirmFeedingDetails = async () => {
+
+    if (feedingDetailsSubmitting) {
+      // Prevent duplicate submissions.
+      return;
+    }
+
     if (!selectedPen) {
-      // Nothing to target yet — don't touch the toggle UI or fire a
-      // request; just prompt the farmer to pick a Pig Pen first.
-      setShowNoPenWarning(true);
+      setFeedingFormError('Please choose a Pig Pen first.');
       return;
     }
-    setShowNoPenWarning(false);
 
-    // Defense-in-depth against a second overlapping request for the SAME
-    // toggle (the UI already disables the control while its own
-    // feedingLoading/sanitationLoading is true, but this covers any input
-    // that slips through before that state commits).
-    const inProgressRef =
-      type === 'feeding' ? feedingUpdateInProgressRef : sanitationUpdateInProgressRef;
-    if (inProgressRef.current) {
-      console.log(`[manual-update] ${type} update already in progress, ignoring duplicate press.`);
+    if (!feedTypeSelected) {
+      setFeedingFormError('Please select a Feed Type.');
       return;
     }
-    inProgressRef.current = true;
-    activeUpdateCountRef.current += 1;
 
-    const deviceCode = selectedPen.device_code;
-    const previousValue = type === 'feeding' ? feedingOverride : sanitationOverride;
+    const trimmedAmount = feedAmountKg.trim();
 
-    // Optimistically flip the toggle right away, then confirm with the
-    // backend. This keeps the UI feeling instant while still being safe:
-    // if the request fails, we roll the toggle back below.
-    // The ref is updated in the same breath as setState (not via a
-    // useEffect one render later) so that if the *other* toggle is
-    // pressed a moment later — before this render has committed — it
-    // reads this toggle's freshest value instead of a stale snapshot.
-    if (type === 'feeding') {
-      setFeedingOverride(nextValue);
-      feedingOverrideRef.current = nextValue;
-      setFeedingLoading(true);
-    } else {
-      setSanitationOverride(nextValue);
-      sanitationOverrideRef.current = nextValue;
-      setSanitationLoading(true);
+    if (!trimmedAmount) {
+      setFeedingFormError('Please enter the Feed Amount.');
+      return;
     }
+
+    const parsedAmount = Number(trimmedAmount);
+
+    if (!Number.isFinite(parsedAmount)) {
+      setFeedingFormError('Feed Amount must be a valid number.');
+      return;
+    }
+
+    if (parsedAmount <= 0) {
+      setFeedingFormError('Feed Amount must be greater than 0.');
+      return;
+    }
+
+    // ----------------------------------------------------------------
+    // IMPORTANT:
+    //
+    // The farmer enters the FEED AMOUNT PER PIG.
+    //
+    // The backend manual_feeding.php will multiply this value by
+    // the selected Pig Pen's pig_count to calculate the TOTAL feed
+    // required for this manual feeding execution.
+    // ----------------------------------------------------------------
+
+    const preparedPayload = {
+      pen_id: selectedPen.pen_id,
+      device_code: selectedPen.device_code,
+      pig_count:
+        selectedPen.pig_count ?? null,
+      feed_type: feedTypeSelected,
+      feed_amount_kg: parsedAmount,
+    };
+
+    setPreparedManualFeeding(preparedPayload);
+    setFeedingFormError(null);
+    setFeedingDetailsSubmitting(true);
 
     try {
-      const payload = {
-        device_code: deviceCode,
-        manual_feeding: type === 'feeding' ? nextValue : feedingOverrideRef.current,
-        manual_sanitation: type === 'sanitation' ? nextValue : sanitationOverrideRef.current,
+
+      // ------------------------------------------------------------------
+      // BACKEND PAYLOAD
+      //
+      // manual_feeding.php resolves device_code and pig_count from
+      // pen_id itself.
+      //
+      // IMPORTANT:
+      // feed_amount_per_pig is the amount entered by the farmer PER PIG.
+      // The backend calculates:
+      //
+      // total_feed_required =
+      //     pig_count * feed_amount_per_pig
+      //
+      // and then calculates the feeding duration using the current
+      // temporary calibration:
+      //
+      // 3 seconds = 3 kg
+      // 1 second = 1 kg
+      // ------------------------------------------------------------------
+
+      const backendPayload = {
+        pen_id: selectedPen.pen_id,
+        feed_type: feedTypeSelected,
+        feed_amount_per_pig: parsedAmount,
       };
 
-      const response = await fetch(UPDATE_MANUAL_OVERRIDE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const response =
+        await fetch(
+          MANUAL_FEEDING_ENDPOINT,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body:
+              JSON.stringify(
+                backendPayload
+              ),
+          }
+        );
 
-      console.log(`HTTP Status (${type} update):`, response.status);
-      const raw = await response.text();
-      console.log(`Raw Response (${type} update):`, raw);
+      console.log(
+        'HTTP Status (manual feeding):',
+        response.status
+      );
+
+      const raw =
+        await response.text();
+
+      console.log(
+        'Raw Response (manual feeding):',
+        raw
+      );
 
       let data: any = null;
+
       try {
-        data = raw ? JSON.parse(raw) : null;
+
+        data =
+          raw
+            ? JSON.parse(raw)
+            : null;
+
       } catch (parseError) {
-        console.error('[manual-update] response was not valid JSON', {
-          source: 'manual-update',
-          type,
-          endpoint: UPDATE_MANUAL_OVERRIDE_ENDPOINT,
-          status: response.status,
-          raw,
-          parseError,
-        });
+
+        console.error(
+          '[manual-feeding] response was not valid JSON',
+          {
+            source: 'manual-feeding',
+            endpoint: MANUAL_FEEDING_ENDPOINT,
+            status: response.status,
+            raw,
+            parseError,
+          }
+        );
+
       }
 
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || 'Failed to update manual override.');
+      if (
+        !response.ok ||
+        !data?.success
+      ) {
+
+        throw new Error(
+          data?.message ||
+          'Failed to start manual feeding.'
+        );
+
       }
 
-      onOverrideChange?.(type, nextValue);
-    } catch (error) {
-      console.error('[manual-update] failed', {
-        source: 'manual-update',
-        type,
-        endpoint: UPDATE_MANUAL_OVERRIDE_ENDPOINT,
-        device_code: deviceCode,
-        attemptedValue: nextValue,
-        error,
-      });
+      // ------------------------------------------------------------------
+      // SUCCESS
+      //
+      // manual_feeding.php has already created the feeding_schedule_logs
+      // row and set manual_override.manual_feeding = 1. Do NOT call
+      // update_manual_override.php or reset_manual_override.php here —
+      // the existing Pico polling / feed_cycle() / reset flow owns
+      // everything from this point onward.
+      // ------------------------------------------------------------------
 
-      // Restore the previous toggle state since the backend didn't
-      // confirm the change.
-      if (type === 'feeding') {
-        setFeedingOverride(previousValue);
-        feedingOverrideRef.current = previousValue;
-      } else {
-        setSanitationOverride(previousValue);
-        sanitationOverrideRef.current = previousValue;
-      }
-    } finally {
-      if (type === 'feeding') {
-        setFeedingLoading(false);
-      } else {
-        setSanitationLoading(false);
-      }
-      inProgressRef.current = false;
-      activeUpdateCountRef.current = Math.max(0, activeUpdateCountRef.current - 1);
+      setFeedingOverride(true);
+      feedingOverrideRef.current = true;
+
+      onOverrideChange?.(
+        'feeding',
+        true
+      );
+
+      setFeedingDetailsSubmitting(false);
+
+      closeFeedingDetailsForm();
+
+    } catch (error: any) {
+
+      console.error(
+        '[manual-feeding] failed',
+        {
+          source: 'manual-feeding',
+          endpoint: MANUAL_FEEDING_ENDPOINT,
+          pen_id: selectedPen.pen_id,
+          feed_type: feedTypeSelected,
+          feed_amount_per_pig: parsedAmount,
+          error,
+        }
+      );
+
+      setFeedingDetailsSubmitting(false);
+
+      // Keep the modal open with the entered values so the farmer can
+      // correct/retry, per the failure requirements.
+      setFeedingFormError(
+        error?.message ||
+        'Failed to start manual feeding. Please try again.'
+      );
+
     }
+
   };
+
+
+  // ------------------------------------------------------------------------
+  // MANUAL SANITATION DETAILS FORM HANDLERS (NEW)
+  // ------------------------------------------------------------------------
+
+  const closeSanitationDetailsForm = () => {
+
+    setSanitationDetailsVisible(false);
+    setSanitationDurationSeconds('');
+    setSanitationFormError(null);
+
+  };
+
+
+  const handleConfirmSanitationDetails = async () => {
+
+    if (sanitationDetailsSubmitting) {
+      // Prevent duplicate submissions.
+      return;
+    }
+
+    if (!selectedPen) {
+      setSanitationFormError('Please choose a Pig Pen first.');
+      return;
+    }
+
+    const trimmedDuration = sanitationDurationSeconds.trim();
+
+    if (!trimmedDuration) {
+      setSanitationFormError('Please enter the Duration.');
+      return;
+    }
+
+    const parsedDuration = Number(trimmedDuration);
+
+    if (
+      !Number.isFinite(parsedDuration) ||
+      !Number.isInteger(parsedDuration)
+    ) {
+      setSanitationFormError('Duration must be a whole number of seconds.');
+      return;
+    }
+
+    if (parsedDuration <= 0) {
+      setSanitationFormError('Duration must be greater than 0.');
+      return;
+    }
+
+    setSanitationFormError(null);
+    setSanitationDetailsSubmitting(true);
+
+    try {
+
+      // ------------------------------------------------------------------
+      // BACKEND PAYLOAD
+      //
+      // manual_sanitation.php resolves device_code from pen_id itself and
+      // creates the sanitation_schedule_logs row, so pig_count and
+      // device_code are intentionally NOT sent here.
+      // ------------------------------------------------------------------
+
+      const backendPayload = {
+        pen_id: selectedPen.pen_id,
+        duration_seconds: parsedDuration,
+      };
+
+      const response =
+        await fetch(
+          MANUAL_SANITATION_ENDPOINT,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body:
+              JSON.stringify(
+                backendPayload
+              ),
+          }
+        );
+
+      console.log(
+        'HTTP Status (manual sanitation):',
+        response.status
+      );
+
+      const raw =
+        await response.text();
+
+      console.log(
+        'Raw Response (manual sanitation):',
+        raw
+      );
+
+      let data: any = null;
+
+      try {
+
+        data =
+          raw
+            ? JSON.parse(raw)
+            : null;
+
+      } catch (parseError) {
+
+        console.error(
+          '[manual-sanitation] response was not valid JSON',
+          {
+            source: 'manual-sanitation',
+            endpoint: MANUAL_SANITATION_ENDPOINT,
+            status: response.status,
+            raw,
+            parseError,
+          }
+        );
+
+      }
+
+      if (
+        !response.ok ||
+        !data?.success
+      ) {
+
+        throw new Error(
+          data?.message ||
+          'Failed to start manual sanitation.'
+        );
+
+      }
+
+      // ------------------------------------------------------------------
+      // SUCCESS
+      //
+      // manual_sanitation.php has already created the
+      // sanitation_schedule_logs row (execution_type = "manual") and set
+      // manual_override.manual_sanitation = 1. Do NOT call
+      // update_manual_override.php or reset_manual_override.php here —
+      // the existing Pico polling / sanitation cycle / reset flow owns
+      // everything from this point onward.
+      // ------------------------------------------------------------------
+
+      setSanitationOverride(true);
+      sanitationOverrideRef.current = true;
+
+      onOverrideChange?.(
+        'sanitation',
+        true
+      );
+
+      setSanitationDetailsSubmitting(false);
+
+      closeSanitationDetailsForm();
+
+    } catch (error: any) {
+
+      console.error(
+        '[manual-sanitation] failed',
+        {
+          source: 'manual-sanitation',
+          endpoint: MANUAL_SANITATION_ENDPOINT,
+          pen_id: selectedPen.pen_id,
+          duration_seconds: parsedDuration,
+          error,
+        }
+      );
+
+      setSanitationDetailsSubmitting(false);
+
+      // Keep the modal open with the entered value so the farmer can
+      // correct/retry, per the failure requirements.
+      setSanitationFormError(
+        error?.message ||
+        'Failed to start manual sanitation. Please try again.'
+      );
+
+    }
+
+  };
+
+
+  // ------------------------------------------------------------------------
+  // RENDER
+  // ------------------------------------------------------------------------
 
   return (
     <View style={styles.overrideSection}>
-      <Text style={styles.overrideTitle}>Manual Override Control</Text>
 
-      {/* TARGET PIG PEN PICKER */}
+      <View style={styles.overrideTitleRow}>
+        <Ionicons name="options-outline" size={18} color="#2F5D50" />
+        <Text style={styles.overrideTitle}>
+          Manual Override Control
+        </Text>
+      </View>
+
+
+      {/* ================================================================
+          TARGET PIG PEN PICKER
+          ================================================================ */}
+
       <View style={styles.penPickerBlock}>
+
         <View style={styles.penPickerLabelRow}>
-          <Text style={styles.penPickerLabel}>Target Pig Pen</Text>
+
+          <Ionicons name="grid-outline" size={14} color="#2F5D50" />
+
+          <Text style={styles.penPickerLabel}>
+            Target Pig Pen
+          </Text>
+
         </View>
 
+
         {loadingPigPens ? (
+
           <View style={styles.penPickerLoadingRow}>
-            <ActivityIndicator size="small" color="#2F5D50" />
-            <Text style={styles.penPickerLoadingText}>Loading Pig Pens...</Text>
+
+            <ActivityIndicator
+              size="small"
+              color="#2F5D50"
+            />
+
+            <Text style={styles.penPickerLoadingText}>
+              Loading Pig Pens...
+            </Text>
+
           </View>
+
         ) : noPigPensAvailable ? (
+
           <View style={styles.penPickerEmptyBox}>
-            <Ionicons name="alert-circle-outline" size={15} color="#C97A00" />
-            <Text style={styles.penPickerEmptyText}>No Pig Pens Available</Text>
+
+            <Ionicons
+              name="alert-circle-outline"
+              size={15}
+              color="#C97A00"
+            />
+
+            <Text style={styles.penPickerEmptyText}>
+              No Pig Pens Available
+            </Text>
+
           </View>
+
         ) : (
+
           <>
+
             <TouchableOpacity
               style={styles.penPickerButton}
               activeOpacity={0.8}
-              onPress={() => setPickerVisible(true)}
+              onPress={() =>
+                setPickerVisible(true)
+              }
             >
-              <Text style={styles.penPickerButtonText} numberOfLines={1}>
-                {selectedPen ? selectedPen.pen_name : 'Select a Pig Pen'}
+
+              <Text
+                style={
+                  styles.penPickerButtonText
+                }
+                numberOfLines={1}
+              >
+                {selectedPen
+                  ? selectedPen.pen_name
+                  : 'Select Pig Pen'}
               </Text>
-              <Ionicons name="chevron-down" size={16} color="#8A9994" />
+
+              <Ionicons
+                name="chevron-down"
+                size={17}
+                color="#2F5D50"
+              />
+
             </TouchableOpacity>
 
-            <Text style={styles.deviceCodeLabel}>Device Code</Text>
-            <Text style={styles.deviceCodeValue}>
-              {selectedPen ? selectedPen.device_code : '—'}
+
+            <Text style={styles.deviceCodeLabel}>
+              Device Code
             </Text>
+
+            <Text style={styles.deviceCodeValue}>
+              {selectedPen
+                ? selectedPen.device_code
+                : '—'}
+            </Text>
+
           </>
+
         )}
+
 
         {showNoPenWarning && (
+
           <View style={styles.warningRow}>
-            <Ionicons name="information-circle-outline" size={14} color="#C62828" />
+
+            <Ionicons
+              name="information-circle-outline"
+              size={14}
+              color="#C62828"
+            />
+
             <Text style={styles.warningText}>
-              Please choose a Pig Pen before using manual override.
+              Please choose a Pig Pen before
+              using manual override.
             </Text>
+
           </View>
+
         )}
+
       </View>
 
-      <View style={styles.overrideRowDivider} />
 
-      <View style={[styles.overrideRow, controlsDisabled && styles.overrideRowDisabled]}>
-        <View style={styles.overrideRowLeft}>
+      <View
+        style={styles.overrideRowDivider}
+      />
+
+
+      {/* ================================================================
+          FEEDING
+          ================================================================ */}
+
+      <View
+        style={[
+          styles.overrideRow,
+          controlsDisabled &&
+            styles.overrideRowDisabled,
+        ]}
+      >
+
+        <View
+          style={styles.overrideRowLeft}
+        >
+
           <View
             style={[
               styles.overrideDot,
-              feedingOverride && styles.overrideDotActive,
+              feedingOverride &&
+                styles.overrideDotActive,
             ]}
           />
-          <Text style={styles.overrideRowLabel}>Feeding</Text>
+
+          <Ionicons
+            name="restaurant-outline"
+            size={16}
+            color="#2F5D50"
+          />
+
+          <Text
+            style={styles.overrideRowLabel}
+          >
+            Feeding
+          </Text>
+
         </View>
+
 
         <TouchableOpacity
           activeOpacity={0.8}
-          disabled={feedingLoading || controlsDisabled}
+          disabled={
+            feedingLoading ||
+            controlsDisabled
+          }
           style={[
             styles.toggleTrack,
-            feedingOverride && styles.toggleTrackActive,
-            (feedingLoading || controlsDisabled) && styles.toggleTrackDisabled,
+            feedingOverride &&
+              styles.toggleTrackActive,
+            (feedingLoading ||
+              controlsDisabled) &&
+              styles.toggleTrackDisabled,
           ]}
-          onPress={() => handleManualOverride('feeding', !feedingOverride)}
+          onPress={
+            handleFeedingTogglePress
+          }
         >
+
           {feedingLoading ? (
+
             <ActivityIndicator
               size="small"
               color="#2F5D50"
               style={[
                 styles.toggleThumb,
-                feedingOverride && styles.toggleThumbActive,
+                feedingOverride &&
+                  styles.toggleThumbActive,
               ]}
             />
+
           ) : (
+
             <View
               style={[
                 styles.toggleThumb,
-                feedingOverride && styles.toggleThumbActive,
+                feedingOverride &&
+                  styles.toggleThumbActive,
               ]}
             />
+
           )}
+
         </TouchableOpacity>
+
       </View>
 
-      <View style={styles.overrideRowDivider} />
 
-      <View style={[styles.overrideRow, controlsDisabled && styles.overrideRowDisabled]}>
-        <View style={styles.overrideRowLeft}>
+      <View
+        style={styles.overrideRowDivider}
+      />
+
+
+      {/* ================================================================
+          SANITATION
+          ================================================================ */}
+
+      <View
+        style={[
+          styles.overrideRow,
+          controlsDisabled &&
+            styles.overrideRowDisabled,
+        ]}
+      >
+
+        <View
+          style={styles.overrideRowLeft}
+        >
+
           <View
             style={[
               styles.overrideDot,
-              sanitationOverride && styles.overrideDotActive,
+              sanitationOverride &&
+                styles.overrideDotActive,
             ]}
           />
-          <Text style={styles.overrideRowLabel}>Sanitation</Text>
+
+          <Ionicons
+            name="water-outline"
+            size={16}
+            color="#2F5D50"
+          />
+
+          <Text
+            style={styles.overrideRowLabel}
+          >
+            Sanitation
+          </Text>
+
         </View>
+
 
         <TouchableOpacity
           activeOpacity={0.8}
-          disabled={sanitationLoading || controlsDisabled}
+          disabled={
+            sanitationLoading ||
+            controlsDisabled
+          }
           style={[
             styles.toggleTrack,
-            sanitationOverride && styles.toggleTrackActive,
-            (sanitationLoading || controlsDisabled) && styles.toggleTrackDisabled,
+            sanitationOverride &&
+              styles.toggleTrackActive,
+            (sanitationLoading ||
+              controlsDisabled) &&
+              styles.toggleTrackDisabled,
           ]}
-          onPress={() => handleManualOverride('sanitation', !sanitationOverride)}
+          onPress={
+            handleSanitationTogglePress
+          }
         >
+
           {sanitationLoading ? (
+
             <ActivityIndicator
               size="small"
               color="#2F5D50"
               style={[
                 styles.toggleThumb,
-                sanitationOverride && styles.toggleThumbActive,
+                sanitationOverride &&
+                  styles.toggleThumbActive,
               ]}
             />
+
           ) : (
+
             <View
               style={[
                 styles.toggleThumb,
-                sanitationOverride && styles.toggleThumbActive,
+                sanitationOverride &&
+                  styles.toggleThumbActive,
               ]}
             />
+
           )}
+
         </TouchableOpacity>
+
       </View>
 
-      {/* PIG PEN PICKER MODAL */}
+
+      {/* ================================================================
+          PIG PEN PICKER MODAL
+          ================================================================ */}
+
       <Modal
         visible={pickerVisible}
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={() => setPickerVisible(false)}
+        onRequestClose={() =>
+          setPickerVisible(false)
+        }
       >
+
         <TouchableOpacity
           style={pickerStyles.overlay}
           activeOpacity={1}
-          onPress={() => setPickerVisible(false)}
+          onPress={() =>
+            setPickerVisible(false)
+          }
         >
-          <View style={pickerStyles.sheet}>
-            <Text style={pickerStyles.sheetTitle}>Select Pig Pen</Text>
+
+          <View
+            style={pickerStyles.sheet}
+          >
+
+            <Text
+              style={pickerStyles.sheetTitle}
+            >
+              Select Pig Pen
+            </Text>
+
+
             {pigPens.map((pen) => {
-              const isActive = pen.pen_id === selectedPenId;
+
+              const isActive =
+                pen.pen_id ===
+                selectedPenId;
+
+
               return (
+
                 <TouchableOpacity
                   key={pen.pen_id}
-                  style={[pickerStyles.option, isActive && pickerStyles.optionActive]}
+                  style={[
+                    pickerStyles.option,
+                    isActive &&
+                      pickerStyles.optionActive,
+                  ]}
                   activeOpacity={0.8}
                   onPress={() => {
-                    setSelectedPenId(pen.pen_id);
-                    setShowNoPenWarning(false);
-                    setPickerVisible(false);
+
+                    setSelectedPenId(
+                      pen.pen_id
+                    );
+
+                    setShowNoPenWarning(
+                      false
+                    );
+
+                    setPickerVisible(
+                      false
+                    );
+
                   }}
                 >
-                  <View style={pickerStyles.optionTextBlock}>
+
+                  <View
+                    style={
+                      pickerStyles.optionTextBlock
+                    }
+                  >
+
                     <Text
                       style={[
                         pickerStyles.optionLabel,
-                        isActive && pickerStyles.optionLabelActive,
+                        isActive &&
+                          pickerStyles.optionLabelActive,
                       ]}
                     >
                       {pen.pen_name}
                     </Text>
-                    <Text style={pickerStyles.optionDeviceCode}>{pen.device_code}</Text>
+
+
+                    <Text
+                      style={
+                        pickerStyles.optionDeviceCode
+                      }
+                    >
+                      {pen.device_code}
+                    </Text>
+
                   </View>
+
+
                   {isActive && (
-                    <Ionicons name="checkmark-circle" size={18} color="#2F5D50" />
+
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color="#2F5D50"
+                    />
+
                   )}
+
                 </TouchableOpacity>
+
               );
+
             })}
+
           </View>
+
         </TouchableOpacity>
+
       </Modal>
+
+
+      {/* ================================================================
+          CONFIRM MANUAL OVERRIDE MODAL
+          ================================================================ */}
+
+      <Modal
+        visible={
+          pendingOverride !== null
+        }
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+
+          if (
+            !confirmSubmitting
+          ) {
+
+            setPendingOverride(
+              null
+            );
+
+            setConfirmError(
+              null
+            );
+
+          }
+
+        }}
+      >
+
+        <TouchableOpacity
+          style={confirmStyles.overlay}
+          activeOpacity={1}
+          onPress={() => {
+
+            if (
+              !confirmSubmitting
+            ) {
+
+              setPendingOverride(
+                null
+              );
+
+              setConfirmError(
+                null
+              );
+
+            }
+
+          }}
+        >
+
+          <TouchableOpacity
+            activeOpacity={1}
+            style={
+              confirmStyles.container
+            }
+          >
+
+            <Text
+              style={confirmStyles.title}
+            >
+              {pendingOverride?.type ===
+              'feeding'
+                ? 'Confirm Manual Feeding'
+                : 'Confirm Manual Sanitation'}
+            </Text>
+
+
+            <Text
+              style={confirmStyles.message}
+            >
+              {pendingOverride?.type ===
+              'feeding'
+                ? 'Are you sure you want to manually activate the feeding system for the selected Pig Pen?\n\nThis action will immediately send the command to the Raspberry Pi.'
+                : 'Are you sure you want to manually activate the sanitation system for the selected Pig Pen?\n\nThis action will immediately send the command to the Raspberry Pi.'}
+            </Text>
+
+
+            {confirmError && (
+
+              <Text
+                style={
+                  confirmStyles.errorText
+                }
+              >
+                {confirmError}
+              </Text>
+
+            )}
+
+
+            <View
+              style={confirmStyles.buttonRow}
+            >
+
+              <TouchableOpacity
+                style={[
+                  confirmStyles.button,
+                  confirmStyles.cancelButton,
+                ]}
+                activeOpacity={0.8}
+                disabled={
+                  confirmSubmitting
+                }
+                onPress={() => {
+
+                  setPendingOverride(
+                    null
+                  );
+
+                  setConfirmError(
+                    null
+                  );
+
+                }}
+              >
+
+                <Text
+                  style={
+                    confirmStyles.cancelButtonText
+                  }
+                >
+                  Cancel
+                </Text>
+
+              </TouchableOpacity>
+
+
+              <TouchableOpacity
+                style={[
+                  confirmStyles.button,
+                  confirmStyles.confirmButton,
+                ]}
+                activeOpacity={0.8}
+                disabled={
+                  confirmSubmitting
+                }
+                onPress={async () => {
+
+                  if (
+                    !pendingOverride ||
+                    confirmSubmitting
+                  ) {
+                    return;
+                  }
+
+
+                  const {
+                    type,
+                    nextValue,
+                  } =
+                    pendingOverride;
+
+
+                  setConfirmError(
+                    null
+                  );
+
+                  setConfirmSubmitting(
+                    true
+                  );
+
+
+                  const result =
+                    await handleManualOverride(
+                      type,
+                      nextValue
+                    );
+
+
+                  setConfirmSubmitting(
+                    false
+                  );
+
+
+                  if (
+                    result.success
+                  ) {
+
+                    setPendingOverride(
+                      null
+                    );
+
+                  } else {
+
+                    setConfirmError(
+                      result.message ||
+                      'Failed to update manual override.'
+                    );
+
+                  }
+
+                }}
+              >
+
+                {confirmSubmitting ? (
+
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+
+                ) : (
+
+                  <Text
+                    style={
+                      confirmStyles.confirmButtonText
+                    }
+                  >
+                    Confirm
+                  </Text>
+
+                )}
+
+              </TouchableOpacity>
+
+            </View>
+
+          </TouchableOpacity>
+
+        </TouchableOpacity>
+
+      </Modal>
+
+
+      {/* ================================================================
+          CYCLE IN PROGRESS MODAL
+          ================================================================ */}
+
+      <Modal
+        visible={
+          showCycleInProgress
+        }
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setShowCycleInProgress(false)
+        }
+      >
+
+        <TouchableOpacity
+          style={confirmStyles.overlay}
+          activeOpacity={1}
+          onPress={() =>
+            setShowCycleInProgress(
+              false
+            )
+          }
+        >
+
+          <TouchableOpacity
+            activeOpacity={1}
+            style={
+              confirmStyles.container
+            }
+          >
+
+            <Text
+              style={
+                confirmStyles.title
+              }
+            >
+              {cycleInProgressType ===
+              'feeding'
+                ? 'Feeding Cycle in Progress'
+                : 'Sanitation Cycle in Progress'}
+            </Text>
+
+
+            <Text
+              style={
+                confirmStyles.message
+              }
+            >
+              {cycleInProgressType ===
+              'feeding'
+                ? 'This feeding cycle cannot be stopped while it is ongoing. Please wait until the cycle is completed.'
+                : 'This sanitation cycle cannot be stopped while it is ongoing. Please wait until the cycle is completed.'}
+            </Text>
+
+
+            <TouchableOpacity
+              style={[
+                confirmStyles.button,
+                confirmStyles.confirmButton,
+              ]}
+              activeOpacity={0.8}
+              onPress={() => {
+
+                setShowCycleInProgress(
+                  false
+                );
+
+                setCycleInProgressType(
+                  null
+                );
+
+              }}
+            >
+
+              <Text
+                style={
+                  confirmStyles.confirmButtonText
+                }
+              >
+                OK
+              </Text>
+
+            </TouchableOpacity>
+
+          </TouchableOpacity>
+
+        </TouchableOpacity>
+
+      </Modal>
+
+
+      {/* ================================================================
+          MANUAL FEEDING DETAILS MODAL (NEW - Phase 1: frontend only)
+          ================================================================ */}
+
+      <Modal
+        visible={feedingDetailsVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closeFeedingDetailsForm}
+      >
+
+        <TouchableOpacity
+          style={confirmStyles.overlay}
+          activeOpacity={1}
+          onPress={closeFeedingDetailsForm}
+        >
+
+          <TouchableOpacity
+            activeOpacity={1}
+            style={confirmStyles.container}
+          >
+
+            <Text style={confirmStyles.title}>
+              Manual Feeding
+            </Text>
+
+
+            <View style={feedFormStyles.field}>
+              <Text style={feedFormStyles.fieldLabel}>
+                Pig Pen
+              </Text>
+              <Text style={feedFormStyles.fieldValue}>
+                {selectedPen
+                  ? selectedPen.pen_name
+                  : '—'}
+              </Text>
+            </View>
+
+
+            <View style={feedFormStyles.field}>
+              <Text style={feedFormStyles.fieldLabel}>
+                Total Pigs
+              </Text>
+              <Text style={feedFormStyles.fieldValue}>
+                {selectedPen &&
+                selectedPen.pig_count !== null &&
+                selectedPen.pig_count !== undefined
+                  ? `${selectedPen.pig_count} pigs`
+                  : '—'}
+              </Text>
+            </View>
+
+
+            <View style={feedFormStyles.field}>
+              <Text style={feedFormStyles.fieldLabel}>
+                Feed Type
+              </Text>
+
+              <TouchableOpacity
+                style={styles.penPickerButton}
+                activeOpacity={0.8}
+                onPress={() =>
+                  setFeedTypePickerVisible(true)
+                }
+              >
+                <Text
+                  style={styles.penPickerButtonText}
+                  numberOfLines={1}
+                >
+                  {feedTypeSelected ?? 'Select Feed Type'}
+                </Text>
+
+                <Ionicons
+                  name="chevron-down"
+                  size={17}
+                  color="#2F5D50"
+                />
+              </TouchableOpacity>
+            </View>
+
+
+            <View style={feedFormStyles.field}>
+              <Text style={feedFormStyles.fieldLabel}>
+                Feed Amount Per Pig (kg)
+              </Text>
+
+              <TextInput
+                style={feedFormStyles.input}
+                value={feedAmountKg}
+                onChangeText={setFeedAmountKg}
+                placeholder="e.g. 5"
+                placeholderTextColor="#A0B5AD"
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+
+            {feedingFormError && (
+              <Text style={confirmStyles.errorText}>
+                {feedingFormError}
+              </Text>
+            )}
+
+
+            <View style={confirmStyles.buttonRow}>
+
+              <TouchableOpacity
+                style={[
+                  confirmStyles.button,
+                  confirmStyles.cancelButton,
+                ]}
+                activeOpacity={0.8}
+                onPress={closeFeedingDetailsForm}
+              >
+                <Text style={confirmStyles.cancelButtonText}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+
+              <TouchableOpacity
+                style={[
+                  confirmStyles.button,
+                  confirmStyles.confirmButton,
+                ]}
+                activeOpacity={0.8}
+                disabled={
+                  feedingDetailsSubmitting
+                }
+                onPress={handleConfirmFeedingDetails}
+              >
+                {feedingDetailsSubmitting ? (
+
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+
+                ) : (
+
+                  <Text style={confirmStyles.confirmButtonText}>
+                    Confirm Feeding
+                  </Text>
+
+                )}
+
+              </TouchableOpacity>
+
+            </View>
+
+          </TouchableOpacity>
+
+        </TouchableOpacity>
+
+      </Modal>
+
+
+      {/* ================================================================
+          FEED TYPE PICKER MODAL (NEW - Phase 1: frontend only)
+          ================================================================ */}
+
+      <Modal
+        visible={feedTypePickerVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() =>
+          setFeedTypePickerVisible(false)
+        }
+      >
+
+        <TouchableOpacity
+          style={pickerStyles.overlay}
+          activeOpacity={1}
+          onPress={() =>
+            setFeedTypePickerVisible(false)
+          }
+        >
+
+          <View style={pickerStyles.sheet}>
+
+            <Text style={pickerStyles.sheetTitle}>
+              Select Feed Type
+            </Text>
+
+            {FEED_TYPE_OPTIONS.map((option) => {
+
+              const isActive =
+                option === feedTypeSelected;
+
+              return (
+
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    pickerStyles.option,
+                    isActive &&
+                      pickerStyles.optionActive,
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setFeedTypeSelected(option);
+                    setFeedTypePickerVisible(false);
+                  }}
+                >
+
+                  <View style={pickerStyles.optionTextBlock}>
+                    <Text
+                      style={[
+                        pickerStyles.optionLabel,
+                        isActive &&
+                          pickerStyles.optionLabelActive,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                  </View>
+
+                  {isActive && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color="#2F5D50"
+                    />
+                  )}
+
+                </TouchableOpacity>
+
+              );
+
+            })}
+
+          </View>
+
+        </TouchableOpacity>
+
+      </Modal>
+
+
+      {/* ================================================================
+          MANUAL SANITATION DETAILS MODAL (NEW)
+          ================================================================ */}
+
+      <Modal
+        visible={sanitationDetailsVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closeSanitationDetailsForm}
+      >
+
+        <TouchableOpacity
+          style={confirmStyles.overlay}
+          activeOpacity={1}
+          onPress={closeSanitationDetailsForm}
+        >
+
+          <TouchableOpacity
+            activeOpacity={1}
+            style={confirmStyles.container}
+          >
+
+            <Text style={confirmStyles.title}>
+              Manual Sanitation
+            </Text>
+
+
+            <View style={feedFormStyles.field}>
+              <Text style={feedFormStyles.fieldLabel}>
+                Pig Pen
+              </Text>
+              <Text style={feedFormStyles.fieldValue}>
+                {selectedPen
+                  ? selectedPen.pen_name
+                  : '—'}
+              </Text>
+            </View>
+
+
+            <View style={feedFormStyles.field}>
+              <Text style={feedFormStyles.fieldLabel}>
+                Duration (seconds)
+              </Text>
+
+              <TextInput
+                style={feedFormStyles.input}
+                value={sanitationDurationSeconds}
+                onChangeText={setSanitationDurationSeconds}
+                placeholder="e.g. 30"
+                placeholderTextColor="#A0B5AD"
+                keyboardType="number-pad"
+              />
+            </View>
+
+
+            {sanitationFormError && (
+              <Text style={confirmStyles.errorText}>
+                {sanitationFormError}
+              </Text>
+            )}
+
+
+            <View style={confirmStyles.buttonRow}>
+
+              <TouchableOpacity
+                style={[
+                  confirmStyles.button,
+                  confirmStyles.cancelButton,
+                ]}
+                activeOpacity={0.8}
+                onPress={closeSanitationDetailsForm}
+              >
+                <Text style={confirmStyles.cancelButtonText}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+
+              <TouchableOpacity
+                style={[
+                  confirmStyles.button,
+                  confirmStyles.confirmButton,
+                ]}
+                activeOpacity={0.8}
+                disabled={
+                  sanitationDetailsSubmitting
+                }
+                onPress={handleConfirmSanitationDetails}
+              >
+                {sanitationDetailsSubmitting ? (
+
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+
+                ) : (
+
+                  <Text style={confirmStyles.confirmButtonText}>
+                    Confirm Sanitation
+                  </Text>
+
+                )}
+
+              </TouchableOpacity>
+
+            </View>
+
+          </TouchableOpacity>
+
+        </TouchableOpacity>
+
+      </Modal>
+
     </View>
   );
 };
 
+
+// --------------------------------------------------------------------------
+// MAIN STYLES
+// --------------------------------------------------------------------------
+
 const styles = StyleSheet.create({
+
   overrideSection: {
     marginHorizontal: 20,
     marginTop: 14,
@@ -554,15 +2556,24 @@ const styles = StyleSheet.create({
     borderColor: '#E2EDEA',
   },
 
-  overrideTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1A2D27',
-    fontFamily: 'Inter',
-    marginBottom: 10,
+  overrideTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
 
-  // Target Pig Pen picker block
+  overrideTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A2D27',
+    fontFamily: 'Arial',
+  },
+
+  // ------------------------------------------------------------------------
+  // PIG PEN PICKER
+  // ------------------------------------------------------------------------
+
   penPickerBlock: {
     backgroundColor: '#F7F8F9',
     borderRadius: 14,
@@ -570,17 +2581,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 8,
   },
+
   penPickerLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
+
   penPickerLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#5B6E67',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
+
   penPickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -592,26 +2606,30 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
+
   penPickerButtonText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     marginRight: 8,
   },
+
   penPickerLoadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 10,
   },
+
   penPickerLoadingText: {
-    fontSize: 12.5,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#8A9994',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
+
   penPickerEmptyBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -621,40 +2639,49 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
   },
+
   penPickerEmptyText: {
-    fontSize: 12.5,
+    fontSize: 14.5,
     fontWeight: '700',
     color: '#A9790B',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
+
   deviceCodeLabel: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '600',
     color: '#A0B5AD',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     marginTop: 2,
   },
+
   deviceCodeValue: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
     letterSpacing: 0.2,
   },
+
   warningRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 2,
   },
+
   warningText: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 13.5,
     fontWeight: '600',
     color: '#C62828',
-    fontFamily: 'Inter',
-    lineHeight: 15,
+    fontFamily: 'Arial',
+    lineHeight: 18,
   },
+
+  // ------------------------------------------------------------------------
+  // OVERRIDE ROW
+  // ------------------------------------------------------------------------
 
   overrideRow: {
     flexDirection: 'row',
@@ -670,7 +2697,7 @@ const styles = StyleSheet.create({
   overrideRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 9,
   },
 
   overrideRowDivider: {
@@ -690,11 +2717,15 @@ const styles = StyleSheet.create({
   },
 
   overrideRowLabel: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: '#1A2D27',
-    fontFamily: 'Inter',
+    fontFamily: 'Arial',
   },
+
+  // ------------------------------------------------------------------------
+  // TOGGLE
+  // ------------------------------------------------------------------------
 
   toggleTrack: {
     width: 44,
@@ -720,7 +2751,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignSelf: 'flex-start',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
     shadowOpacity: 0.15,
     shadowRadius: 2,
     elevation: 2,
@@ -729,67 +2763,234 @@ const styles = StyleSheet.create({
   toggleThumbActive: {
     alignSelf: 'flex-end',
   },
+
 });
 
-const pickerStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(26, 45, 39, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  sheet: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    gap: 6,
-    shadowColor: '#0F2D24',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  sheetTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1A2D27',
-    fontFamily: 'Inter',
-    marginBottom: 6,
-    paddingHorizontal: 4,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  optionActive: {
-    backgroundColor: '#EAF7F1',
-  },
-  optionTextBlock: {
-    gap: 2,
-  },
-  optionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1A2D27',
-    fontFamily: 'Inter',
-  },
-  optionLabelActive: {
-    color: '#2F5D50',
-  },
-  optionDeviceCode: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#A0B5AD',
-    fontFamily: 'Inter',
-  },
-});
+
+// --------------------------------------------------------------------------
+// PIG PEN PICKER MODAL STYLES
+// --------------------------------------------------------------------------
+
+const pickerStyles =
+  StyleSheet.create({
+
+    overlay: {
+      flex: 1,
+      backgroundColor:
+        'rgba(26, 45, 39, 0.4)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 28,
+    },
+
+    sheet: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      paddingVertical: 16,
+      paddingHorizontal: 14,
+      gap: 6,
+      shadowColor: '#0F2D24',
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
+      elevation: 8,
+    },
+
+    sheetTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: '#1A2D27',
+      fontFamily: 'Arial',
+      marginBottom: 6,
+      paddingHorizontal: 4,
+    },
+
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+    },
+
+    optionActive: {
+      backgroundColor: '#EAF7F1',
+    },
+
+    optionTextBlock: {
+      gap: 2,
+    },
+
+    optionLabel: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#1A2D27',
+      fontFamily: 'Arial',
+    },
+
+    optionLabelActive: {
+      color: '#2F5D50',
+    },
+
+    optionDeviceCode: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: '#A0B5AD',
+      fontFamily: 'Arial',
+    },
+
+  });
+
+
+// --------------------------------------------------------------------------
+// CONFIRMATION MODAL STYLES
+// --------------------------------------------------------------------------
+
+const confirmStyles =
+  StyleSheet.create({
+
+    overlay: {
+      flex: 1,
+      backgroundColor:
+        'rgba(26, 45, 39, 0.4)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 28,
+    },
+
+    container: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 18,
+      shadowColor: '#0F2D24',
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
+      elevation: 8,
+    },
+
+    title: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: '#1A2D27',
+      fontFamily: 'Arial',
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+
+    message: {
+      fontSize: 14.5,
+      fontWeight: '500',
+      color: '#5B6E67',
+      fontFamily: 'Arial',
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 18,
+    },
+
+    errorText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#C62828',
+      fontFamily: 'Arial',
+      textAlign: 'center',
+      lineHeight: 18,
+      marginBottom: 14,
+      marginTop: -8,
+    },
+
+    buttonRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+
+    button: {
+      flex: 1,
+      height: 48,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    cancelButton: {
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#DCE6E2',
+    },
+
+    cancelButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#5B6E67',
+      fontFamily: 'Arial',
+    },
+
+    confirmButton: {
+      backgroundColor: '#2F5D50',
+    },
+
+    confirmButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      fontFamily: 'Arial',
+    },
+
+  });
+
+
+// --------------------------------------------------------------------------
+// MANUAL FEEDING DETAILS FORM STYLES (NEW - Phase 1: frontend only)
+// --------------------------------------------------------------------------
+
+const feedFormStyles =
+  StyleSheet.create({
+
+    field: {
+      marginBottom: 12,
+      gap: 6,
+    },
+
+    fieldLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#A0B5AD',
+      fontFamily: 'Arial',
+    },
+
+    fieldValue: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#1A2D27',
+      fontFamily: 'Arial',
+    },
+
+    input: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#DCE6E2',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#1A2D27',
+      fontFamily: 'Arial',
+    },
+
+  });
+
 
 export default ManualOverrideControls;

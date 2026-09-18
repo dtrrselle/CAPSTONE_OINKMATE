@@ -11,7 +11,7 @@ interface SystemStatusBannerProps {
   lastUpdated?: string;
 }
 
-// ─── Status Config ────────────────────────────────────────────────────────────
+// ─── Status Config (semantic — do not force to green) ─────────────────────────
 
 const STATUS_CONFIG: Record<
   ConnectionStatus,
@@ -139,17 +139,19 @@ const styles = StyleSheet.create({
   },
   textBlock: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   title: {
-    fontSize: 14,
+    fontFamily: 'Arial',
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A2D27',
   },
   subtitle: {
-    fontSize: 11,
-    color: '#7A9990',
-    lineHeight: 16,
+    fontFamily: 'Arial',
+    fontSize: 13,
+    color: '#5F6D69',
+    lineHeight: 18,
   },
   liveChip: {
     flexDirection: 'row',
@@ -166,7 +168,8 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   liveLabel: {
-    fontSize: 10,
+    fontFamily: 'Arial',
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
   },

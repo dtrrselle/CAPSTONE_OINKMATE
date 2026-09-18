@@ -5,9 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 interface ReportsMenuProps {
   expenseStat?: string;
   roiStat?: string;
+  marketStat?: string;
   learningStat?: string;
   onExpenseTrackingPress?: () => void;
   onFinancialAnalysisPress?: () => void;
+  onMarketRecommendationPress?: () => void;
   onLearningHubPress?: () => void;
 }
 
@@ -24,9 +26,11 @@ interface MenuCardConfig {
 const ReportsMenu: React.FC<ReportsMenuProps> = ({
   expenseStat = '₱18,450 This Month',
   roiStat = 'ROI 18%',
+  marketStat = 'Recommended to Sell',
   learningStat = '12 Articles Available',
   onExpenseTrackingPress,
   onFinancialAnalysisPress,
+  onMarketRecommendationPress,
   onLearningHubPress,
 }) => {
   const cards: MenuCardConfig[] = [
@@ -47,6 +51,15 @@ const ReportsMenu: React.FC<ReportsMenuProps> = ({
       title: 'Financial Analysis',
       stat: roiStat,
       onPress: onFinancialAnalysisPress,
+    },
+    {
+      key: 'market_recommendation',
+      icon: 'storefront',
+      accent: '#B98A3E',
+      accentBg: '#F7EFE1',
+      title: 'Market Recommendation',
+      stat: marketStat,
+      onPress: onMarketRecommendationPress,
     },
     {
       key: 'learning_hub',
